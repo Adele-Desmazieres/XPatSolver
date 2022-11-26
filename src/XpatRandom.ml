@@ -175,12 +175,12 @@ let rec recValueRemover n list ret =
    | [] -> ret
    | x :: l ->
        if x = n then recValueRemover n l ret else
-      let ret = x :: ret in recValueRemover n l
+      let ret = (x :: ret) in recValueRemover n l ret
 ;;
 
 (* créé la permutation finale selon la paire de FIFO donnée en argument *)
 let permutFinal suiteInit files =
-   let ret = []
+   let ret = [] in
    let rec construcPermut suite ret files =
       match suite with
       | [] -> ret
@@ -193,11 +193,7 @@ let permutFinal suiteInit files =
          let suite = recValueRemover currNumb suite [] in
          construcPermut suite ret files
    in
-   construcPermut suiteInit ret files
-;;
-
-
-
+   let ret = construcPermut suiteInit ret files
    in List.rev (construcPermut suiteInit ret files)
 ;;
 
