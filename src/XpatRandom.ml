@@ -14,6 +14,19 @@ let randmax = 1_000_000_000
 let reduce n limit =
   Int.(of_float (to_float n /. to_float randmax *. to_float limit))
 
+let pairCreator lastfst lastsnd last2snd =
+   let newSnd = if (lastsnd - last2snd) >= 0 then (lastsnd - last2snd) else ((lastsnd - last2snd) + randmax) in 
+   ((lastfst + 21 mod 55), newSnd) ;;
+
+let listOfPair seed =
+   let ret = [(21, 1); (0, seed)] in
+   let rec addPair l iter =
+      if iter = 55 then l else
+      let popLast = List.nth l 0 in
+      let popLast2 = List.nth l 1 in
+      let l = pairCreator (fst popLast) (snd popLast) (snd popLast2) :: l in
+      addPair l iter+1
+   in addPair ret 2 ;;
 
 (** DESCRIPTION DE L'ALGORITHME DE GENERATION DES PERMUTATIONS
 
