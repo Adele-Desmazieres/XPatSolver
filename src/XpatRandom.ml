@@ -25,7 +25,7 @@ let listOfPair seed =
       let popLast = List.nth l 0 in
       let popLast2 = List.nth l 1 in
       let l = pairCreator (fst popLast) (snd popLast) (snd popLast2) :: l in
-      addPair l iter+1
+      addPair l (iter+1)
    in addPair ret 2 ;;
 
 (** DESCRIPTION DE L'ALGORITHME DE GENERATION DES PERMUTATIONS
