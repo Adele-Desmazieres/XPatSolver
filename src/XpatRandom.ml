@@ -14,25 +14,6 @@ let randmax = 1_000_000_000
 let reduce n limit =
   Int.(of_float (to_float n /. to_float randmax *. to_float limit))
 
-let pairCreator lastfst lastsnd last2snd =
-   let newSnd = if (lastsnd - last2snd) >= 0 then (lastsnd - last2snd) else ((lastsnd - last2snd) + randmax) in 
-   ((lastfst + 21 mod 55), newSnd) ;;
-
-let comparaison_lexico paire1 paire2 =
-   let compare_fst = compare (fst (paire1)) (fst (paire2)) in
-   if compare_fst <> 0 then compare_fst
-   else compare (snd (paire1)) (snd (paire2)) 
-
-let listOfPair seed =
-   let ret = [(21, 1); (0, seed)] in
-   let rec addPair l iter =
-      if iter = 55 then l else
-      let popLast = List.nth l 0 in
-      let popLast2 = List.nth l 1 in
-      let l = pairCreator (fst popLast) (snd popLast) (snd popLast2) :: l in
-      addPair l (iter+1)
-   in let ret = addPair ret 2 in
-   List.sort comparaison_lexico ret ;;
 
 (** DESCRIPTION DE L'ALGORITHME DE GENERATION DES PERMUTATIONS
 
@@ -131,6 +112,101 @@ let shuffle_test = function
       45;5;3;41;15;12;31;17;28;8;29;30;37]
   | _ -> failwith "shuffle : unsupported number (TODO)"
 
+(* crée une paire en suivant la suite décrire dans a) *)
+let pairCreator lastfst lastsnd last2snd =
+   let newSnd = if (lastsnd - last2snd) >= 0 then (lastsnd - last2snd) else ((lastsnd - last2snd) + randmax) in 
+   ((lastfst + 21 mod 55), newSnd) 
+;;
+
+(* compare lexicographiquement deux paires *)
+let comparaison_lexico paire1 paire2 =
+   let compare_fst = compare (fst (paire1)) (fst (paire2)) in
+   if compare_fst <> 0 then compare_fst
+   else compare (snd (paire1)) (snd (paire2)) 
+;;
+
+(* crée une liste de paire qui suit les propriétés décrites dans a) *)
+let listOfPair seed =
+   let ret = [(21, 1); (0, seed)] in
+   let rec addPair l iter =
+      if iter = 55 then l else
+      let popLast = List.nth l 0 in
+      let popLast2 = List.nth l 1 in
+      let l = pairCreator (fst popLast) (snd popLast) (snd popLast2) :: l in
+      addPair l (iter+1)
+   in let ret = addPair ret 2 in
+   List.sort comparaison_lexico ret 
+;;
+
+(* crée une paire de FIFO qui contiennent les deuxièmes composantes des paires de la liste l, en ayant une longueur de 24 et 31 respectivement *)
+let FIFOpair l = 
+   let rec splitList l ret iter =
+      match l with
+      | [] -> ret
+      | pair :: l ->
+         if iter < 24 then
+            let ret = (snd (pair) :: fst (ret), snd (ret)) in splitList l ret (iter+1)
+         else
+            let ret = (fst (ret), snd (pair) :: snd (ret)) in splitList l ret (iter+1)
+   in
+   let splittedList = splitList l ([],[]) 0 in
+   (Fifo.of_list (fst splittedList), Fifo.of_list (snd splittedList)) 
+;;
+
+(* effectue un tirage comme décrit dans c) et renvoie les nouvelles FIFO mises à jour *)
+let tirage files =
+   let n1 = Fifo.pop (fst files) in
+   let n2 = Fifo.pop (snd files) in
+   if n2 <= n1 then 
+      let d = n1 - n2 in ((Fifo.push n2 (fst files), Fifo.push d (snd files)), d)
+   else
+      let d = (n1 - n2) + randmax in ((Fifo.push n2 (fst files), Fifo.push d (snd files)), d)
+;;
+
+(* effectue 165 tirages (si iter est initialisé à 1) comme décrits dans la fonction ci-dessus *)
+let rec tirage165 files iter =
+   if iter = 165 then fst (files) else
+   let files = fst (tirage (files) in tirage165 files (iter+1))
+;;
+
+(* enlève un élément n d'une liste s'il existe en temps linéaire, renvoie la liste sans l'élément ou celle de base sinon *)
+let rec recValueRemover n list ret =
+   match list with
+   | [] -> ret
+   | x :: l ->
+       if x = n then recValueRemover n l ret else
+      let ret = x :: ret in recValueRemover n l
+;;
+
+(* créé la permutation finale selon la paire de FIFO donnée en argument *)
+let permutFinal suiteInit files =
+   let ret = []
+   let rec construcPermut suite ret files =
+      match suite with
+      | [] -> ret
+      | _ ->
+         let dataPair = tirage files in
+         let files = fst (dataPair) in
+         let pos = reduce (snd (dataPair)) (List.len suite) in
+         let currNumb = List.nth suite pos in
+         let ret = currNumb :: ret in
+         let suite = recValueRemover currNumb suite [] in
+         construcPermut suite ret files
+   in
+   construcPermut suiteInit ret files
+;;
+
+
+
+   in List.rev (construcPermut suiteInit ret files)
+;;
+
 
 let shuffle n =
-  shuffle_test n (* TODO: changer en une implementation complete *)
+  (* shuffle_test n TODO: changer en une implementation complete *)
+
+  let files = tirage165 (FIFOpair (listOfPair n)) 1 in
+  let suiteInit = List.init 52 (fun x -> x) in
+  permutFinal suiteInit files
+;;
+
