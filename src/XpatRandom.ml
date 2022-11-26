@@ -18,6 +18,11 @@ let pairCreator lastfst lastsnd last2snd =
    let newSnd = if (lastsnd - last2snd) >= 0 then (lastsnd - last2snd) else ((lastsnd - last2snd) + randmax) in 
    ((lastfst + 21 mod 55), newSnd) ;;
 
+let comparaison_lexico paire1 paire2 =
+   let compare_fst = compare (fst (paire1)) (fst (paire2)) in
+   if compare_fst <> 0 then compare_fst
+   else compare (snd (paire1)) (snd (paire2)) 
+
 let listOfPair seed =
    let ret = [(21, 1); (0, seed)] in
    let rec addPair l iter =
@@ -26,7 +31,8 @@ let listOfPair seed =
       let popLast2 = List.nth l 1 in
       let l = pairCreator (fst popLast) (snd popLast) (snd popLast2) :: l in
       addPair l (iter+1)
-   in addPair ret 2 ;;
+   in let ret = addPair ret 2 in
+   List.sort comparaison_lexico ret ;;
 
 (** DESCRIPTION DE L'ALGORITHME DE GENERATION DES PERMUTATIONS
 
