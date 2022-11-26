@@ -139,7 +139,7 @@ let listOfPair seed =
 ;;
 
 (* crée une paire de FIFO qui contiennent les deuxièmes composantes des paires de la liste l, en ayant une longueur de 24 et 31 respectivement *)
-let FIFOpair l = 
+let queuePair l = 
    let rec splitList l ret iter =
       match l with
       | [] -> ret
@@ -205,7 +205,7 @@ let permutFinal suiteInit files =
 let shuffle n =
   (* shuffle_test n TODO: changer en une implementation complete *)
 
-  let files = tirage165 (FIFOpair (listOfPair n)) 1 in
+  let files = tirage165 (queuePair (listOfPair n)) 1 in
   let suiteInit = List.init 52 (fun x -> x) in
   permutFinal suiteInit files
 ;;
