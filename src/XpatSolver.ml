@@ -30,6 +30,54 @@ let set_game_seed name =
   with _ -> failwith ("Error: <game>.<number> expected, with <game> in "^
                       "FreeCell Seahaven MidnightOil BakersDozen")
 
+type coup = {
+  destination : int; (* carte / pile de destination *)
+  source : int; (* carte / pile source *)
+}
+
+type enchainementCouleur = Alternee | Identique | Toutes 
+
+type regles = {
+  capaciteRegistre : int;
+  nbrColonnes : int;
+  distributionCartes : int list; (* Comment sont distribuées initialement les cartes e.g. 7;6;7;6;7;6;7;6] pour FreeCell *)
+  carteSurColonneVide : (Card.rank option) option; (* Quel est le rang de carte autorisé sur une colonne vide : None -> Aucun, Some (n) -> rang n, Some (None) -> Tous *)
+  enchainement : enchainementCouleur;
+}
+
+type etat = {
+ 
+  (* colonnes et dépot éventullement à faire en piles (LIPO) *)
+  colonnes : (Card.card list) list;
+  dépot : Card.card list;
+  registre : Card.card list; (* A implémenter en Set *)
+
+}
+
+(* Construit l'état initial de la partie : place les cartes dans les colonnes (et registres si nécéssaire), repositionne bien les rois si Baker's Dozen*)
+let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card list) =
+  (*TODO*) ()
+;;
+
+(* Transforme la permutation en liste de cartes : ATTENTION inverse l'ordre*)
+let rec permutToCardList (permut : int list) (ret : Card.card list) =
+  match permut with
+  | [] -> ret
+  | x :: l ->
+    let ret = (Card.of_num x) :: ret in permutToCardList l ret
+
+
+let definirRegles (conf : config) =
+  match conf.game with
+  | Freecell ->
+    {capaciteRegistre = 4; nbrColonnes = 8; distributionCartes = [7;6;7;6;7;6;7;6]; carteSurColonneVide = Some (None); enchainement = Alternee;}
+  | Seahaven ->
+    {capaciteRegistre = 4; nbrColonnes = 10; distributionCartes = [5]; carteSurColonneVide = Some (Some 13); enchainement = Identique}
+  | Midnight ->
+    {capaciteRegistre = 0; nbrColonnes = 18; distributionCartes = [3]; carteSurColonneVide = None; enchainement = Identique}
+  | Baker ->
+    {capaciteRegistre = 0; nbrColonnes = 13; distributionCartes = [4]; carteSurColonneVide = None; enchainement = Toutes}
+
 (* TODO : La fonction suivante est à adapter et continuer *)
 
 let treat_game conf =
@@ -41,6 +89,8 @@ let treat_game conf =
     permut;
   print_newline ();
   print_string "C'est tout pour l'instant. TODO: continuer...\n";
+  let regles = definirRegles conf in
+  let paquet = List.rev (permutToCardList permut []) in
   exit 0
 
 let main () =
