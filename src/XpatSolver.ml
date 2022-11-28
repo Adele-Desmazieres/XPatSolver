@@ -31,8 +31,8 @@ let set_game_seed name =
                       "FreeCell Seahaven MidnightOil BakersDozen")
 
 type coup = {
-  destination : int; (* carte / pile de destination *)
-  source : int; (* carte / pile source *)
+  destination : string; (* carte / pile / registre de destination *)
+  source : Card.card; (* carte source *)
 }
 
 type enchainementCouleur = Alternee | Identique | Toutes 
@@ -47,7 +47,7 @@ type regles = {
 
 type etat = {
  
-  (* colonnes et dépot éventullement à faire en piles (LIPO) *)
+  (* colonnes et dépot éventullement à faire en piles (LIFO) *)
   colonnes : (Card.card list) list;
   dépot : Card.card list;
   registre : Card.card list; (* A implémenter en Set *)
@@ -60,6 +60,21 @@ let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card lis
   (*TODO*) ()
 ;;
 
+(* Renvoie vrai si le coup est légal par rapport aux règles et à l'état courant *)
+let coupLegal (coup : coup) (regles : regles) (etat : etat) =
+  (* TODO *) true
+;; 
+
+(* Normalise l'état actuel, i.e. mets les cartes qui peuvent aller au dépôt, dans le dépôt *)
+let normaliser (etat : etat) =
+  (*  TODO  *) ()
+;;
+
+(* Met à jour l'état actuel, i.e applique le coup à l'état actuel (à appeler seulement si le coup est légal...)*)
+let miseAJourPartie (coup : coup) (etat : etat) =
+  (*    TODO    *) ()
+;;
+
 (* Transforme la permutation en liste de cartes : ATTENTION inverse l'ordre*)
 let rec permutToCardList (permut : int list) (ret : Card.card list) =
   match permut with
@@ -67,7 +82,7 @@ let rec permutToCardList (permut : int list) (ret : Card.card list) =
   | x :: l ->
     let ret = (Card.of_num x) :: ret in permutToCardList l ret
 
-
+(* Renvoie un type règle qui correspond au jeu actuel *)
 let definirRegles (conf : config) =
   match conf.game with
   | Freecell ->
