@@ -40,7 +40,7 @@ type enchainementCouleur = Alternee | Identique | Toutes
 type regles = {
   capaciteRegistre : int;
   nbrColonnes : int;
-  distributionCartes : int list; (* Comment sont distribuées initialement les cartes e.g. 7;6;7;6;7;6;7;6] pour FreeCell *)
+  distributionCartes : int list; (* Comment sont distribuées initialement les cartes e.g. [7;6;7;6;7;6;7;6] pour FreeCell *)
   carteSurColonneVide : (Card.rank option) option; (* Quel est le rang de carte autorisé sur une colonne vide : None -> Aucun, Some (n) -> rang n, Some (None) -> Tous *)
   enchainement : enchainementCouleur;
 }
