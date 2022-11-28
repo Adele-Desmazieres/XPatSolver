@@ -113,7 +113,7 @@ let shuffle_test = function
   | _ -> failwith "shuffle : unsupported number (TODO)"
 
 (* crée une paire en suivant la suite décrire dans a) *)
-let pairCreator lastfst lastsnd last2snd =
+let pairCreator (lastfst : int) (lastsnd : int) (last2snd : int) =
    let newSnd = if (lastsnd - last2snd) >= 0 then (lastsnd - last2snd) else ((lastsnd - last2snd) + randmax) in 
    ((lastfst + 21 mod 55), newSnd) 
 ;;
@@ -126,7 +126,7 @@ let comparaison_lexico paire1 paire2 =
 ;;
 
 (* crée une liste de paire qui suit les propriétés décrites dans a) *)
-let listOfPair seed =
+let listOfPair (seed : int) =
    let ret = [(21, 1); (0, seed)] in
    let rec addPair l iter =
       if iter = 55 then l else
@@ -139,8 +139,8 @@ let listOfPair seed =
 ;;
 
 (* crée une paire de FIFO qui contiennent les deuxièmes composantes des paires de la liste l, en ayant une longueur de 24 et 31 respectivement *)
-let queuePair l = 
-   let rec splitList l ret iter =
+let queuePair (l : (int * int) list) = 
+   let rec splitList (l : (int * int) list) (ret : int list * int list) (iter : int) =
       match l with
       | [] -> ret
       | pair :: l ->
@@ -154,9 +154,12 @@ let queuePair l =
 ;;
 
 (* effectue un tirage comme décrit dans c) et renvoie les nouvelles FIFO mises à jour *)
-let tirage files =
-   let n1 = Fifo.pop (fst files) in
-   let n2 = Fifo.pop (snd files) in
+let tirage (files : int Fifo.t * int Fifo.t) =
+   let newFile1 = Fifo.pop (fst files) in
+   let newFile2 = Fifo.pop (snd files) in
+   let n1 : int = fst (newFile1) in
+   let n2 : int = fst (newFile2) in
+   let files = (snd (newFile1), snd (newFile2)) in
    if n2 <= n1 then 
       let d = n1 - n2 in ((Fifo.push n2 (fst files), Fifo.push d (snd files)), d)
    else
@@ -164,13 +167,13 @@ let tirage files =
 ;;
 
 (* effectue 165 tirages (si iter est initialisé à 1) comme décrits dans la fonction ci-dessus *)
-let rec tirage165 files iter =
-   if iter = 165 then fst (files) else
-   let files = fst (tirage (files) in tirage165 files (iter+1))
+let rec tirage165 (files : int Fifo.t * int Fifo.t) (iter : int) =
+   if iter = 165 then files else
+   let files = fst (tirage (files)) in tirage165 files (iter+1)
 ;;
 
 (* enlève un élément n d'une liste s'il existe en temps linéaire, renvoie la liste sans l'élément ou celle de base sinon *)
-let rec recValueRemover n list ret =
+let rec recValueRemover (n : int) (list : int list) (ret : int list) =
    match list with
    | [] -> ret
    | x :: l ->
@@ -179,15 +182,15 @@ let rec recValueRemover n list ret =
 ;;
 
 (* créé la permutation finale selon la paire de FIFO donnée en argument *)
-let permutFinal suiteInit files =
+let permutFinal (suiteInit : int list) (files : int Fifo.t * int Fifo.t) =
    let ret = [] in
-   let rec construcPermut suite ret files =
+   let rec construcPermut (suite : int list) (ret : int list) (files : int Fifo.t * int Fifo.t) =
       match suite with
       | [] -> ret
       | _ ->
          let dataPair = tirage files in
          let files = fst (dataPair) in
-         let pos = reduce (snd (dataPair)) (List.len suite) in
+         let pos = reduce (snd (dataPair)) (List.length suite) in
          let currNumb = List.nth suite pos in
          let ret = currNumb :: ret in
          let suite = recValueRemover currNumb suite [] in
