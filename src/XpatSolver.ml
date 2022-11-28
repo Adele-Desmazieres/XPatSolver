@@ -51,6 +51,7 @@ type etat = {
   colonnes : (Card.card list) list;
   dépot : Card.card list;
   registre : Card.card list; (* A implémenter en Set *)
+  historique : coup list;
 
 }
 
