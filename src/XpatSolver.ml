@@ -49,7 +49,7 @@ type etat = {
  
   (* colonnes et dépot éventullement à faire en piles (LIFO) *)
   colonnes : (Card.card list) list;
-  dépot : Card.card list;
+  depot : Card.card list;
   registre : Card.card list; (* A implémenter en Set *)
   historique : coup list;
 

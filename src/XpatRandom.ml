@@ -150,7 +150,7 @@ let queuePair (l : (int * int) list) =
             let ret = (fst (ret), snd (pair) :: snd (ret)) in splitList l ret (iter+1)
    in
    let splittedList = splitList l ([],[]) 0 in
-   (Fifo.of_list (fst splittedList), Fifo.of_list (snd splittedList)) 
+   (Fifo.of_list (snd splittedList), Fifo.of_list (fst splittedList)) 
 ;;
 
 (* effectue un tirage comme décrit dans c) et renvoie les nouvelles FIFO mises à jour *)
