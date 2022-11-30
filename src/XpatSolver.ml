@@ -31,8 +31,10 @@ let set_game_seed name =
                       "FreeCell Seahaven MidnightOil BakersDozen")
 
 type coup = {
-  destination : string; (* carte / pile / registre de destination *)
+  
+  destination : string; (* carte : son numéro 0 à 51 / col vide : "V" / registre : "T" *)
   source : Card.card; (* carte source *)
+
 }
 
 type enchainementCouleur = Alternee | Identique | Toutes 
@@ -45,20 +47,84 @@ type regles = {
   enchainement : enchainementCouleur;
 }
 
+type 'a pile = {
+  
+  contenu : 'a list;
+  taille : int;
+
+}
+
 type etat = {
  
-  (* colonnes et dépot éventullement à faire en piles (LIFO) *)
-  colonnes : (Card.card list) list;
-  depot : Card.card list;
+  colonnes : (Card.card pile) list; (* Colonnes à implémenter en piles (LIFO) *)
+  depot : Card.card list; (* Contient une liste des dernieres cartes ajoutées *)
   registre : Card.card list; (* A implémenter en Set *)
   historique : coup list;
 
 }
 
-(* Construit l'état initial de la partie : place les cartes dans les colonnes (et registres si nécéssaire), repositionne bien les rois si Baker's Dozen*)
-let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card list) =
-  (*TODO*) ()
+let newPile =
+  {contenu = []; taille = 0}
 ;;
+
+(* Renvoie une paire contenant l'élément pop et la nouvelle pile sans cet élément *)
+let popPile (p : 'a pile) =
+  match p.contenu with
+  | [] -> failwith "Pile vide"
+  | e::c2 -> (e, {contenu = c2; taille = p.taille-1})
+;;
+
+let pushPile (p : 'a pile) (e : 'a) =
+  {contenu = e::p.contenu; taille = p.taille+1}
+;;
+
+let peekPile (p : 'a pile) =
+  match p.contenu with
+  | [] -> failwith "Pile vide"
+  | e::c2 -> e
+;;
+
+
+(* Faire en sorte que regles contiennent toutes les tailles de colonnes, dont les vides *)
+
+(* Construit l'état initial de la partie : place les cartes dans les colonnes (et registres si nécéssaire)
+   repositionne bien les rois si Baker's Dozen *)
+let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card list) =
+
+  let construireColonnes =
+    (*let paquetPile = listToPile paquet in*)
+    
+    let rec oneColonneInit (nbToAdd : int) (col : Card.card pile) (paquet : Card.card list) =
+      if (nbToAdd = 0) then (col, paquet)
+      else (* let (carte, paquet2) = popPile paquet in*)
+      match paquet with 
+      | [] -> failwith "Paquet vide, distribution impossible. "
+      | carte::paquet2 -> oneColonneInit (nbToAdd-1) (pushPile col carte) paquet2
+    in 
+    
+    let rec aux (cols : Card.card pile list) (colDistrib : int list) (paquet : Card.card list) =
+      match colDistrib with
+      | [] -> (cols, paquet)
+      | nbCartes::colDistrib2 -> 
+        let (col, paq2) = oneColonneInit nbCartes newPile paquet in 
+        aux (col::cols) colDistrib2 paq2
+      
+      (*oneColonneInit regles.distributionCartes.get(x) newPile*)
+    in
+    aux [] regles.distributionCartes paquet
+    
+  in
+  
+  let (colonnes, paquet2) = construireColonnes in
+  
+  {
+  colonnes = colonnes;
+  depot = [];
+  registre = paquet2; (* TODO : vérifier si ca passe de faire ca comme ca *)
+  historique = [];
+  }
+;;
+
 
 (* Renvoie vrai si le coup est légal par rapport aux règles et à l'état courant *)
 let coupLegal (coup : coup) (regles : regles) (etat : etat) =
