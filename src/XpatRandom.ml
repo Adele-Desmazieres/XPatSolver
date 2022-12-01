@@ -46,14 +46,14 @@ d) On commence alors par faire 165 tirages successifs en partant
    les entiers issus de ces 165 premiers tirages ne sont pas considérés.
 
 e) La fonction de tirage vue précédemment produit un entier dans
-   [0..randmax[. Pour en déduire un entier dans [0..limit[ (ou limit est
+   {0..randmax{. Pour en déduire un entier dans {0..limit{ (ou limit est
    un entier positif quelconque), on utilisera alors la fonction `reduce`
    fournie plus haut.
    Les tirages suivants nous servent à créer la permutation voulue des
    52 cartes. On commence avec une liste des nombres successifs entre 0 et 51.
-   Un tirage dans [0..52[ nous donne alors la position du premier nombre
+   Un tirage dans {0..52{ nous donne alors la position du premier nombre
    à mettre dans notre permutation. On enlève alors le nombre à cette position
-   dans la liste. Puis un tirage dans [0..51[ nous donne la position
+   dans la liste. Puis un tirage dans {0..51{ nous donne la position
    (dans la liste restante) du second nombre de notre permutation. On continue
    ainsi à tirer des positions valides dans la liste résiduelle, puis à retirer
    les nombres à ces positions tirées, jusqu'à épuisement de la liste.
@@ -114,18 +114,28 @@ let shuffle_test = function
 
 (* crée une paire en suivant la suite décrire dans a) *)
 let pairCreator (lastfst : int) (lastsnd : int) (last2snd : int) =
-   let newSnd = if (lastsnd - last2snd) >= 0 then (lastsnd - last2snd) else ((lastsnd - last2snd) + randmax) in 
-   ((lastfst + 21 mod 55), newSnd) 
+   let newSnd = 
+      if (lastsnd >= last2snd) then (lastsnd - last2snd) 
+      else (lastsnd - last2snd + randmax) in 
+   ((lastfst + 21) mod 55, newSnd) 
 ;;
 
-(* compare lexicographiquement deux paires *)
-let comparaison_lexico paire1 paire2 =
-   let compare_fst = compare (fst (paire1)) (fst (paire2)) in
-   if compare_fst <> 0 then compare_fst
-   else compare (snd (paire1)) (snd (paire2)) 
+(* compare deux paires (a1, b1) (a2, b2), et renvoie 
+   1  si a1 > a2
+   -1 si a1 < a2 
+   si a1 = a2 alors comparaison de b1 et b2 suivant le meme modele
+*)
+let comparaison paire1 paire2 =
+   (*let compare_fst = compare (fst (paire1)) (fst (paire2)) in*)
+   if (fst paire1 = fst paire2) then 
+      if (snd paire1 = snd paire2) then 0
+      else if (snd paire1 > snd paire2) then 1
+      else -1
+   else if (fst paire1 > fst paire2) then 1
+   else -1
 ;;
 
-(* crée une liste de paire qui suit les propriétés décrites dans a) *)
+(* crée une liste de paire qui suit les propriétés décrites dans b) *)
 let listOfPair (seed : int) =
    let ret = [(21, 1); (0, seed)] in
    let rec addPair l iter =
@@ -135,10 +145,11 @@ let listOfPair (seed : int) =
       let l = pairCreator (fst popLast) (snd popLast) (snd popLast2) :: l in
       addPair l (iter+1)
    in let ret = addPair ret 2 in
-   List.sort comparaison_lexico ret 
+   List.sort comparaison ret 
 ;;
 
-(* crée une paire de FIFO qui contiennent les deuxièmes composantes des paires de la liste l, en ayant une longueur de 24 et 31 respectivement *)
+(* crée deux FIFO qui contiennent les deuxièmes composantes des paires de la liste l 
+   en ayant une longueur de 24 et 31 respectivement *)
 let queuePair (l : (int * int) list) = 
    let rec splitList (l : (int * int) list) (ret : int list * int list) (iter : int) =
       match l with
