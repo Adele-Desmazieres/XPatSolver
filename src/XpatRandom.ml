@@ -209,31 +209,26 @@ let tirage (files : int Fifo.t * int Fifo.t) =
 ;;
 
 (* effectue 165 tirages (si iter est initialisé à 1) comme décrits dans la fonction ci-dessus *)
-let rec tirage165 (files : int Fifo.t * int Fifo.t) (iter : int) =
-   if iter = 165 then 
-      let tmp = 
-         tmpPrintList (Fifo.to_list (fst files)) ;
-         tmpPrintList (Fifo.to_list (snd files)) 
-      in
-      tmp ;
-      files
+let rec tirageRepete (files : int Fifo.t * int Fifo.t) (iter : int) =
+   if iter = 0 then files
       
    else let files = fst (tirage (files)) in 
-      tirage165 files (iter+1)
+   tirageRepete files (iter-1)
 ;;
 
 (* enlève un élément n d'une liste s'il existe en temps linéaire, renvoie la liste sans l'élément ou celle de base sinon *)
 let rec recValueRemover (n : int) (list : int list) (ret : int list) =
    match list with
-   | [] -> ret
-   | x :: l ->
-       if x = n then recValueRemover n l ret else
-      let ret = (x :: ret) in recValueRemover n l ret
+   | [] -> List.rev ret
+   | x::l ->
+      if x = n then recValueRemover n l ret 
+      else recValueRemover n l (x::ret)
 ;;
 
 (* créé la permutation finale selon la paire de FIFO donnée en argument *)
 let permutFinal (suiteInit : int list) (files : int Fifo.t * int Fifo.t) =
    let ret = [] in
+   
    let rec construcPermut (suite : int list) (ret : int list) (files : int Fifo.t * int Fifo.t) =
       match suite with
       | [] -> ret
@@ -242,19 +237,21 @@ let permutFinal (suiteInit : int list) (files : int Fifo.t * int Fifo.t) =
          let files = fst (dataPair) in
          let pos = reduce (snd (dataPair)) (List.length suite) in
          let currNumb = List.nth suite pos in
-         let ret = currNumb :: ret in
+         let ret = currNumb::ret in
          let suite = recValueRemover currNumb suite [] in
+         (* printf "%d; " currNumb; *)
          construcPermut suite ret files
    in
-   let ret = construcPermut suiteInit ret files
-   in List.rev (construcPermut suiteInit ret files)
+   
+   construcPermut suiteInit ret files
+   (* in List.rev (construcPermut suiteInit ret files) *)
 ;;
 
 
 let shuffle n =
   (* shuffle_test n TODO: changer en une implementation complete *)
 
-  let files = tirage165 (queuePair (listOfPair n)) 0 in
+  let files = tirageRepete (queuePair (listOfPair n)) 165 in
   let suiteInit = List.init 52 (fun x -> x) in
   permutFinal suiteInit files
 ;;
