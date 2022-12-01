@@ -1,3 +1,5 @@
+open Format (* print pour debug *)
+
 (** In Xpat2, the index of the game is a seed used to shuffle
     pseudo-randomly the cards.
     The shuffle function emulates this permutation generator.
@@ -51,19 +53,26 @@ e) La fonction de tirage vue précédemment produit un entier dans
    fournie plus haut.
    Les tirages suivants nous servent à créer la permutation voulue des
    52 cartes. On commence avec une liste des nombres successifs entre 0 et 51.
-   Un tirage dans {0..52{ nous donne alors la position du premier nombre
+   Un tirage dans {0..52{ nous donne alors la position du dernier nombre
    à mettre dans notre permutation. On enlève alors le nombre à cette position
    dans la liste. Puis un tirage dans {0..51{ nous donne la position
-   (dans la liste restante) du second nombre de notre permutation. On continue
-   ainsi à tirer des positions valides dans la liste résiduelle, puis à retirer
-   les nombres à ces positions tirées, jusqu'à épuisement de la liste.
+   (dans la liste restante) de l'avant-dernier nombre de notre permutation.
+   On continue ainsi à tirer des positions valides dans la liste résiduelle,
+   puis à retirer les nombres à ces positions tirées pour les ajouter devant
+   la permutation, jusqu'à épuisement de la liste. Le dernier nombre retiré
+   de la liste donne donc la tête de la permutation.
 
-TODO mettre des exemples intermédiaires
+   NB: /!\ la version initiale de ce commentaire donnait par erreur
+   la permutation dans l'ordre inverse).
+
+Un exemple complet de génération d'une permutation (pour la graine 1)
+est maintenant donné dans le fichier XpatRandomExemple.ml, étape par étape.
 
 *)
 
 (* For now, we provide a shuffle function that can handle a few examples.
    This can be kept later for testing your implementation. *)
+
 
 let shuffle_test = function
   | 1 ->
@@ -115,8 +124,8 @@ let shuffle_test = function
 (* crée une paire en suivant la suite décrire dans a) *)
 let pairCreator (lastfst : int) (lastsnd : int) (last2snd : int) =
    let newSnd = 
-      if (lastsnd >= last2snd) then (lastsnd - last2snd) 
-      else (lastsnd - last2snd + randmax) in 
+      if (last2snd >= lastsnd) then (last2snd - lastsnd) 
+      else (last2snd - lastsnd + randmax) in 
    ((lastfst + 21) mod 55, newSnd) 
 ;;
 
@@ -126,7 +135,6 @@ let pairCreator (lastfst : int) (lastsnd : int) (last2snd : int) =
    si a1 = a2 alors comparaison de b1 et b2 suivant le meme modele
 *)
 let comparaison paire1 paire2 =
-   (*let compare_fst = compare (fst (paire1)) (fst (paire2)) in*)
    if (fst paire1 = fst paire2) then 
       if (snd paire1 = snd paire2) then 0
       else if (snd paire1 > snd paire2) then 1
@@ -135,18 +143,27 @@ let comparaison paire1 paire2 =
    else -1
 ;;
 
-(* crée une liste de paire qui suit les propriétés décrites dans b) *)
+(* crée une liste de paire triée qui suit les propriétés décrites dans a) et début de b) *)
 let listOfPair (seed : int) =
    let ret = [(21, 1); (0, seed)] in
+   
    let rec addPair l iter =
       if iter = 55 then l else
       let popLast = List.nth l 0 in
       let popLast2 = List.nth l 1 in
-      let l = pairCreator (fst popLast) (snd popLast) (snd popLast2) :: l in
-      addPair l (iter+1)
-   in let ret = addPair ret 2 in
-   List.sort comparaison ret 
+      let newPaire = pairCreator (fst popLast) (snd popLast) (snd popLast2) in
+      (* printf "test : (%d, %d)\n%!" (fst newPaire) (snd newPaire); *)
+      addPair (newPaire::l) (iter+1)
+   in 
+   
+   List.sort comparaison (addPair ret 2) 
 ;;
+
+(* debuggage affiche une liste d'entiers *)
+let rec tmpPrintList l =
+   match l with
+   | [] -> printf "\n\n"
+   | e::l2 -> printf "%d; " e; tmpPrintList l2 ;;
 
 (* crée deux FIFO qui contiennent les deuxièmes composantes des paires de la liste l 
    en ayant une longueur de 24 et 31 respectivement *)
@@ -161,7 +178,12 @@ let queuePair (l : (int * int) list) =
             let ret = (fst (ret), snd (pair) :: snd (ret)) in splitList l ret (iter+1)
    in
    let splittedList = splitList l ([],[]) 0 in
-   (Fifo.of_list (snd splittedList), Fifo.of_list (fst splittedList)) 
+   (*
+   tmpPrintList (snd splittedList) ;
+   tmpPrintList (fst splittedList) ; *)
+   
+   (* (f1_init, f2_init) *)
+   (Fifo.of_list (List.rev (snd splittedList)), Fifo.of_list (List.rev (fst splittedList)))
 ;;
 
 (* effectue un tirage comme décrit dans c) et renvoie les nouvelles FIFO mises à jour *)
@@ -170,17 +192,34 @@ let tirage (files : int Fifo.t * int Fifo.t) =
    let newFile2 = Fifo.pop (snd files) in
    let n1 : int = fst (newFile1) in
    let n2 : int = fst (newFile2) in
+      
    let files = (snd (newFile1), snd (newFile2)) in
-   if n2 <= n1 then 
-      let d = n1 - n2 in ((Fifo.push n2 (fst files), Fifo.push d (snd files)), d)
-   else
-      let d = (n1 - n2) + randmax in ((Fifo.push n2 (fst files), Fifo.push d (snd files)), d)
+   
+   let d = 
+      if n2 <= n1 then n1 - n2
+      else n1 - n2 + randmax
+   in
+      
+   let tmp1 = Fifo.push n2 (fst files) in
+   let tmp2 = Fifo.push d (snd files) in
+   
+   (* printf "n1 = %d, n2 = %d, d = %d\n" n1 n2 d; *)
+   
+   ((tmp1, tmp2), d)
 ;;
 
 (* effectue 165 tirages (si iter est initialisé à 1) comme décrits dans la fonction ci-dessus *)
 let rec tirage165 (files : int Fifo.t * int Fifo.t) (iter : int) =
-   if iter = 165 then files else
-   let files = fst (tirage (files)) in tirage165 files (iter+1)
+   if iter = 165 then 
+      let tmp = 
+         tmpPrintList (Fifo.to_list (fst files)) ;
+         tmpPrintList (Fifo.to_list (snd files)) 
+      in
+      tmp ;
+      files
+      
+   else let files = fst (tirage (files)) in 
+      tirage165 files (iter+1)
 ;;
 
 (* enlève un élément n d'une liste s'il existe en temps linéaire, renvoie la liste sans l'élément ou celle de base sinon *)
@@ -215,7 +254,7 @@ let permutFinal (suiteInit : int list) (files : int Fifo.t * int Fifo.t) =
 let shuffle n =
   (* shuffle_test n TODO: changer en une implementation complete *)
 
-  let files = tirage165 (queuePair (listOfPair n)) 1 in
+  let files = tirage165 (queuePair (listOfPair n)) 0 in
   let suiteInit = List.init 52 (fun x -> x) in
   permutFinal suiteInit files
 ;;
