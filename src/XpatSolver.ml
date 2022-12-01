@@ -164,13 +164,14 @@ let definirRegles (conf : config) =
 
 let treat_game conf =
   let permut = XpatRandom.shuffle conf.seed in
-  Printf.printf "Voici juste la permutation de graine %d:\n" conf.seed;
+  Printf.printf "\nVoici juste la permutation de graine %d:\n" conf.seed;
   List.iter (fun n -> print_int n; print_string " ") permut;
+  print_newline ();
   print_newline ();
   List.iter (fun n -> Printf.printf "%s " (Card.to_string (Card.of_num n)))
     permut;
   print_newline ();
-  print_string "C'est tout pour l'instant. TODO: continuer...\n";
+  print_string "\nC'est tout pour l'instant. TODO: continuer...\n";
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
   exit 0
