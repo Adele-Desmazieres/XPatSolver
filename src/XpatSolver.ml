@@ -182,7 +182,7 @@ let coupLegal (coup : coup) (regles : regles) (etat : etat) =
   (* TODO *)
   match coup.destination with
   | "V" -> (possedeColonneVide etat) && (estAccessibleGeneral coup.source) 
-  | "T" -> ((List.length etat.registre) < 4) && (estAccessibleGeneral coup.source)
+  | "T" -> ((List.length etat.registre) < regles.capaciteRegistre) && (estAccessibleGeneral coup.source)
   | x ->
     let val = int_of_string x in
     (estAccessibleSurColonne etat val && respecteEnchainement coup.source (Card.of_num val) && (estAccessibleGeneral coup.source))
