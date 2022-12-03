@@ -70,8 +70,8 @@ let newPile =
 (* Renvoie une paire contenant l'élément pop et la nouvelle pile sans cet élément *)
 let popPile (p : 'a pile) =
   match p.contenu with
-  | [] -> raise (PileError "Pile vide")
-  | e::c2 -> (e, {contenu = c2; taille = p.taille-1})
+  | [] -> None
+  | e::c2 -> Some (e, {contenu = c2; taille = p.taille-1})
 ;;
 
 let pushPile (p : 'a pile) (e : 'a) =
@@ -80,12 +80,10 @@ let pushPile (p : 'a pile) (e : 'a) =
 
 let peekPile (p : 'a pile) =
   match p.contenu with
-  | [] -> raise (PileError "Pile vide")
-  | e::c2 -> e
+  | [] -> None
+  | e::c2 -> Some e
 ;;
 
-
-exception PileError of string ;;
 
 (* Faire en sorte que regles contiennent toutes les tailles de colonnes, dont les vides *)
 
@@ -144,9 +142,10 @@ let estAccessibleSurColonne (etat : etat) (dest : int) =
     match colonnes with
     | [] -> false
     | col :: restantes ->
-      let carteSurPile = try (Card.of_num (peekPile col)) with
-        PileError -> colSearcher restantes dest
-      in if (Card.of_num carteSurPile) = dest then true else colSearcher restantes dest
+      let carteSurPile = (Card.of_num (peekPile col)) 
+      in match carteSurPile with
+      | None -> colSearcher restantes dest
+      | Some x -> if (Card.of_num x) = dest then true else colSearcher restantes dest
   in colSearcher etat.colonnes dest 
 ;;
 
