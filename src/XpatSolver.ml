@@ -1,4 +1,4 @@
-
+open Format (* printf pour l'affichage *)
 open XpatLib
 
 type game = Freecell | Seahaven | Midnight | Baker
@@ -37,7 +37,7 @@ type coup = {
 
 }
 
-type enchainementCouleur = Alternee | Identique | Toutes 
+type enchainementCouleur = Alternee | Identique | Any 
 
 type regles = {
   capaciteRegistre : int;
@@ -55,11 +55,14 @@ type 'a pile = {
 }
 
 type etat = {
- 
-  colonnes : (Card.card pile) list; (* Colonnes à implémenter en piles (LIFO) *)
+  
+  historique : coup list; (* Liste des coups joués jusqu'à l'obtention de cet état *)
+
+  colonnes : (Card.card pile) list; (* Colonnes à implémenter FArray de Piles *)
   depot : Card.card list; (* Contient une liste des dernieres cartes ajoutées *)
-  registre : Card.card list; (* A implémenter en Set *)
-  historique : coup list;
+  registre : Card.card list; (* Liste ordonnée des cartes au registre *)
+  nbRegistresVides : int;
+  nbColonnesVides : int;
 
 }
 
@@ -122,20 +125,26 @@ let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card lis
   depot = [];
   registre = paquet2; (* TODO : vérifier si ca passe de faire ca comme ca *)
   historique = [];
+  nbRegistresVides = regles.nbrColonnes - List.length colonnes;
+  nbColonnesVides = regles.capaciteRegistre - List.length paquet2;
   }
 ;;
 
 (* Renvoie vrai si la carte source peut être posée sur la carte dest selon les règles d'enchaînement *)
-let respecteEnchainement (src : Card.card) (dest : Card.card) (enchainement : enchainementCouleur) =
+let respecteEnchainement 
+((rank1, suit1) : Card.card) 
+((rank2, suit2) : Card.card) 
+(enchainement : enchainementCouleur) =
   match enchainement with
-  | Identique -> ((src.rank = (dest.rank - 1)) && (src.suit = dest.suit))
-  | Tous -> (src.rank = (dest.rank - 1))
+  | Any -> (rank1 = rank2 - 1)
+  | Identique -> ((rank1 = rank2 - 1) && (suit1 = suit2))
   | Alternee ->
-    match dest.suit with
-    | Trefle | Pique -> ((src.suit = Carreau || src.suit = Coeur) && (src.rank = (dest.rank - 1)))
-    | Carreau | Coeur -> ((src.suit = Trefle || src.suit = Pique) && (src.rank = (dest.rank - 1)))
+    match suit2 with
+    | Trefle | Pique -> ((suit1 = Carreau || suit1 = Coeur) && (rank1 = rank2 - 1))
+    | Carreau | Coeur -> ((suit1 = Trefle || suit1 = Pique) && (rank1 = rank2 - 1))
 ;;
 
+(*
 (* Renvoie vrai si la carte représentée par dest est au sommet d'une des colonnes de l'état etat *)
 let estAccessibleSurColonne (etat : etat) (dest : int) =
   let rec colSearcher colonnes dest =
@@ -170,11 +179,9 @@ let possedeColonneVide (etat : etat) =
     match colonnes with
     | [] -> false
     | p :: restantes ->
-      if p.length = 0 then true else possedePileVide restantes
+      if List.length p = 0 then true else possedePileVide restantes
   in possedePileVide etat.colonnes
 ;;
-
-
 
 (* Renvoie vrai si le coup est légal par rapport aux règles et à l'état courant *)
 let coupLegal (coup : coup) (regles : regles) (etat : etat) =
@@ -183,9 +190,40 @@ let coupLegal (coup : coup) (regles : regles) (etat : etat) =
   | "V" -> (possedeColonneVide etat) && (estAccessibleGeneral coup.source) 
   | "T" -> ((List.length etat.registre) < regles.capaciteRegistre) && (estAccessibleGeneral coup.source)
   | x ->
-    let val = int_of_string x in
-    (estAccessibleSurColonne etat val && respecteEnchainement coup.source (Card.of_num val) && (estAccessibleGeneral coup.source))
+    let xEval = int_of_string x in
+    (estAccessibleSurColonne etat xEval && respecteEnchainement coup.source (Card.of_num xEval) && (estAccessibleGeneral coup.source))
 ;; 
+*)
+
+let printList l =
+  List.iter (
+    fun c -> 
+      printf "%s " (Card.to_string c)
+      (*else printf "vide ") *)
+  )
+  l
+;;
+
+let printCardList (l : Card.card list) (name : string) =
+  printf "%s : " name;
+  printList l;
+  printf "\n"
+;;  
+
+let rec printColonnes (l : (Card.card pile) list) (num : int) =
+  match l with
+  |[] -> printf "\n"
+  |pile::l2 -> 
+    printCardList pile.contenu ("c" ^ (string_of_int num));
+    printColonnes l2 (num+1)
+;; 
+
+let printEtat (etat : etat) =
+  printCardList etat.registre "registre";
+  printCardList etat.depot "depot";
+  printColonnes etat.colonnes
+;;
+
 
 (* Normalise l'état actuel, i.e. mets les cartes qui peuvent aller au dépôt, dans le dépôt *)
 let normaliser (etat : etat) =
@@ -214,12 +252,13 @@ let definirRegles (conf : config) =
   | Midnight ->
     {capaciteRegistre = 0; nbrColonnes = 18; distributionCartes = [3]; carteSurColonneVide = None; enchainement = Identique}
   | Baker ->
-    {capaciteRegistre = 0; nbrColonnes = 13; distributionCartes = [4]; carteSurColonneVide = None; enchainement = Toutes}
+    {capaciteRegistre = 0; nbrColonnes = 13; distributionCartes = [4]; carteSurColonneVide = None; enchainement = Any}
 
 (* TODO : La fonction suivante est à adapter et continuer *)
 
 let treat_game conf =
   let permut = XpatRandom.shuffle conf.seed in
+  
   Printf.printf "\nVoici juste la permutation de graine %d:\n" conf.seed;
   List.iter (fun n -> print_int n; print_string " ") permut;
   print_newline ();
@@ -228,9 +267,13 @@ let treat_game conf =
     permut;
   print_newline ();
   print_string "\nC'est tout pour l'instant. TODO: continuer...\n";
+  
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
+  let etat1 = construireEtatInit conf regles paquet in
+  printEtat etat1; (* ERREUR ICI *)
   exit 0
+;;
 
 let main () =
   Arg.parse
