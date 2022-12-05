@@ -70,8 +70,8 @@ let newPile =
 (* Renvoie une paire contenant l'élément pop et la nouvelle pile sans cet élément *)
 let popPile (p : 'a pile) =
   match p.contenu with
-  | [] -> failwith "Pile vide"
-  | e::c2 -> (e, {contenu = c2; taille = p.taille-1})
+  | [] -> None
+  | e::c2 -> Some (e, {contenu = c2; taille = p.taille-1})
 ;;
 
 let pushPile (p : 'a pile) (e : 'a) =
@@ -80,8 +80,8 @@ let pushPile (p : 'a pile) (e : 'a) =
 
 let peekPile (p : 'a pile) =
   match p.contenu with
-  | [] -> failwith "Pile vide"
-  | e::c2 -> e
+  | [] -> None
+  | e::c2 -> Some e
 ;;
 
 
@@ -125,10 +125,66 @@ let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card lis
   }
 ;;
 
+(* Renvoie vrai si la carte source peut être posée sur la carte dest selon les règles d'enchaînement *)
+let respecteEnchainement (src : Card.card) (dest : Card.card) (enchainement : enchainementCouleur) =
+  match enchainement with
+  | Identique -> ((src.rank = (dest.rank - 1)) && (src.suit = dest.suit))
+  | Tous -> (src.rank = (dest.rank - 1))
+  | Alternee ->
+    match dest.suit with
+    | Trefle | Pique -> ((src.suit = Carreau || src.suit = Coeur) && (src.rank = (dest.rank - 1)))
+    | Carreau | Coeur -> ((src.suit = Trefle || src.suit = Pique) && (src.rank = (dest.rank - 1)))
+;;
+
+(* Renvoie vrai si la carte représentée par dest est au sommet d'une des colonnes de l'état etat *)
+let estAccessibleSurColonne (etat : etat) (dest : int) =
+  let rec colSearcher colonnes dest =
+    match colonnes with
+    | [] -> false
+    | col :: restantes ->
+      let carteSurPile = (Card.of_num (peekPile col)) 
+      in match carteSurPile with
+      | None -> colSearcher restantes dest
+      | Some x -> if (Card.of_num x) = dest then true else colSearcher restantes dest
+  in colSearcher etat.colonnes dest 
+;;
+
+(* Renvoie vrai si la carte src est dans le registre de l'état courant *)
+let estDansLeRegistre (src : Card.card) (etat : etat) =
+  let rec registreSearcher reg src =
+    match reg with
+    | [] -> false
+    | x :: r -> if (Card.to_num src) = (Card.to_num x) then true
+    else registreSearcher r src
+  in registreSearcher etat.registre src
+;;
+
+(* Renvoie vrai si la carte src est accessible depuis une colonne ou le registre *)
+let estAccessibleGeneral (etat : etat) (src : Card.card) =
+  (estAccessibleSurColonne etat (Card.to_num src)) || (estDansLeRegistre src etat)
+;;
+
+(* Renvoie vrai si l'etat courant possede au moins une colonne vide *)
+let possedeColonneVide (etat : etat) =
+  let rec possedePileVide colonnes =
+    match colonnes with
+    | [] -> false
+    | p :: restantes ->
+      if p.length = 0 then true else possedePileVide restantes
+  in possedePileVide etat.colonnes
+;;
+
+
 
 (* Renvoie vrai si le coup est légal par rapport aux règles et à l'état courant *)
 let coupLegal (coup : coup) (regles : regles) (etat : etat) =
-  (* TODO *) true
+  (* TODO *)
+  match coup.destination with
+  | "V" -> (possedeColonneVide etat) && (estAccessibleGeneral coup.source) 
+  | "T" -> ((List.length etat.registre) < regles.capaciteRegistre) && (estAccessibleGeneral coup.source)
+  | x ->
+    let val = int_of_string x in
+    (estAccessibleSurColonne etat val && respecteEnchainement coup.source (Card.of_num val) && (estAccessibleGeneral coup.source))
 ;; 
 
 (* Normalise l'état actuel, i.e. mets les cartes qui peuvent aller au dépôt, dans le dépôt *)
