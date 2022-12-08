@@ -128,12 +128,12 @@ let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card lis
 (* Renvoie vrai si la carte source peut être posée sur la carte dest selon les règles d'enchaînement *)
 let respecteEnchainement (src : Card.card) (dest : Card.card) (enchainement : enchainementCouleur) =
   match enchainement with
-  | Identique -> ((src.rank = (dest.rank - 1)) && (src.suit = dest.suit))
-  | Tous -> (src.rank = (dest.rank - 1))
+  | Identique -> ((fst(src) = (fst(dest) - 1)) && (snd(src) = snd(dest)))
+  | Toutes -> (fst(src) = (fst(dest) - 1))
   | Alternee ->
-    match dest.suit with
-    | Trefle | Pique -> ((src.suit = Carreau || src.suit = Coeur) && (src.rank = (dest.rank - 1)))
-    | Carreau | Coeur -> ((src.suit = Trefle || src.suit = Pique) && (src.rank = (dest.rank - 1)))
+    match snd(dest) with
+    | Trefle | Pique -> ((snd(src) = Carreau || snd(src) = Coeur) && (fst(src) = (fst(dest) - 1)))
+    | Carreau | Coeur -> ((snd(src) = Trefle || snd(src) = Pique) && (fst(src) = (fst(dest) - 1)))
 ;;
 
 (* Renvoie vrai si la carte représentée par dest est au sommet d'une des colonnes de l'état etat *)
@@ -142,10 +142,10 @@ let estAccessibleSurColonne (etat : etat) (dest : int) =
     match colonnes with
     | [] -> false
     | col :: restantes ->
-      let carteSurPile = (Card.of_num (peekPile col)) 
+      let carteSurPile = peekPile col
       in match carteSurPile with
       | None -> colSearcher restantes dest
-      | Some x -> if (Card.of_num x) = dest then true else colSearcher restantes dest
+      | Some x -> if (Card.to_num x) = dest then true else colSearcher restantes dest
   in colSearcher etat.colonnes dest 
 ;;
 
@@ -170,7 +170,7 @@ let possedeColonneVide (etat : etat) =
     match colonnes with
     | [] -> false
     | p :: restantes ->
-      if p.length = 0 then true else possedePileVide restantes
+      if p.taille = 0 then true else possedePileVide restantes
   in possedePileVide etat.colonnes
 ;;
 
@@ -180,11 +180,11 @@ let possedeColonneVide (etat : etat) =
 let coupLegal (coup : coup) (regles : regles) (etat : etat) =
   (* TODO *)
   match coup.destination with
-  | "V" -> (possedeColonneVide etat) && (estAccessibleGeneral coup.source) 
-  | "T" -> ((List.length etat.registre) < regles.capaciteRegistre) && (estAccessibleGeneral coup.source)
+  | "V" -> (possedeColonneVide etat) && (estAccessibleGeneral etat coup.source) 
+  | "T" -> ((List.length etat.registre) < regles.capaciteRegistre) && (estAccessibleGeneral etat coup.source)
   | x ->
-    let val = int_of_string x in
-    (estAccessibleSurColonne etat val && respecteEnchainement coup.source (Card.of_num val) && (estAccessibleGeneral coup.source))
+    let input = int_of_string x in
+    (estAccessibleSurColonne etat input && respecteEnchainement coup.source (Card.of_num input) regles.enchainement && (estAccessibleGeneral etat coup.source))
 ;; 
 
 (* Normalise l'état actuel, i.e. mets les cartes qui peuvent aller au dépôt, dans le dépôt *)
