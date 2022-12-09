@@ -119,7 +119,7 @@ let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card lis
   
   {
   colonnes = colonnes;
-  depot = [];
+  depot = [(0, Coeur); (0, Carreau); (0, Trefle); (0, Pique)];
   registre = paquet2; (* TODO : vérifier si ca passe de faire ca comme ca *)
   historique = [];
   }
@@ -191,6 +191,14 @@ let getCartesPourDepot (depot : Card.card list) =
   List.map (fun card -> if fst(card) = 13 then card else (fst(card)+1, snd(card))) depot
 ;; 
 
+let rec construireNouvDepot (depot : Card.card list) (cardsMoved : Card.card list) nouv =
+  match depot with
+  | [] -> nouv @ cardsMoved
+  | card :: restCards ->
+    if List.for_all (fun x -> snd(x) <> snd(card)) cardsMoved then construireNouvDepot restCards cardsMoved (card :: nouv)
+    else construireNouvDepot restCards cardsMoved nouv
+;;
+
 (* Normalise l'état actuel, i.e. mets les cartes qui peuvent aller au dépôt, dans le dépôt *)
 let normaliserColonnes (etat : etat) =
   let wanted = getCartesPourDepot etat.depot in
@@ -200,12 +208,12 @@ let normaliserColonnes (etat : etat) =
     | p :: l ->
       let pop = popPile p in
       match pop with
-      | None -> normaliseCol cols (p :: newCol) cardsMoved
+      | None -> normaliseCol l (p :: newCol) cardsMoved
       | Some (card, pile) ->
         if (List.mem card wanted) = true then normaliseCol l (pile :: newCol) (card :: cardsMoved)
-        else normaliseCol cols (p :: newCol) cardsMoved 
+        else normaliseCol l (p :: newCol) cardsMoved 
   in let newColsAndCardsMoved =  normaliseCol etat.colonnes [] [] in
-  let newDepot = snd (newColsAndCardsMoved) in 
+  let newDepot = construireNouvDepot etat.depot (snd (newColsAndCardsMoved)) [] in 
   let newCols = fst (newColsAndCardsMoved) in 
   { depot = newDepot; colonnes = newCols; registre = etat.registre; historique = etat.historique } 
 ;;
