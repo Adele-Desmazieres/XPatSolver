@@ -187,9 +187,27 @@ let coupLegal (coup : coup) (regles : regles) (etat : etat) =
     (estAccessibleSurColonne etat input && respecteEnchainement coup.source (Card.of_num input) regles.enchainement && (estAccessibleGeneral etat coup.source))
 ;; 
 
+let getCartesPourDepot (depot : Card.card list) =
+  List.map (fun card -> if fst(card) = 13 then card else (fst(card)+1, snd(card))) depot
+;; 
+
 (* Normalise l'état actuel, i.e. mets les cartes qui peuvent aller au dépôt, dans le dépôt *)
-let normaliser (etat : etat) =
-  (*  TODO  *) ()
+let normaliserColonnes (etat : etat) =
+  let wanted = getCartesPourDepot etat.depot in
+  let rec normaliseCol cols newCol cardsMoved =
+    match cols with
+    | [] -> (newCol, cardsMoved)
+    | p :: l ->
+      let pop = popPile p in
+      match pop with
+      | None -> normaliseCol cols (p :: newCol) cardsMoved
+      | Some (card, pile) ->
+        if (List.mem card wanted) = true then normaliseCol l (pile :: newCol) (card :: cardsMoved)
+        else normaliseCol cols (p :: newCol) cardsMoved 
+  in let newColsAndCardsMoved =  normaliseCol etat.colonnes [] [] in
+  let newDepot = snd (newColsAndCardsMoved) in 
+  let newCols = fst (newColsAndCardsMoved) in 
+  { depot = newDepot; colonnes = newCols; registre = etat.registre; historique = etat.historique } 
 ;;
 
 (* Met à jour l'état actuel, i.e applique le coup à l'état actuel (à appeler seulement si le coup est légal...)*)
