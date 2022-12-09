@@ -187,10 +187,12 @@ let coupLegal (coup : coup) (regles : regles) (etat : etat) =
     (estAccessibleSurColonne etat input && respecteEnchainement coup.source (Card.of_num input) regles.enchainement && (estAccessibleGeneral etat coup.source))
 ;; 
 
+(* Construit une liste des cartes qui sont recherchées pour être ajoutées au dépot *)
 let getCartesPourDepot (depot : Card.card list) =
   List.map (fun card -> if fst(card) = 13 then card else (fst(card)+1, snd(card))) depot
 ;; 
 
+(* Construit le nouveau dépot selon les cartes bougées dedans (cardsMoved) *)
 let rec construireNouvDepot (depot : Card.card list) (cardsMoved : Card.card list) nouv =
   match depot with
   | [] -> nouv @ cardsMoved
@@ -200,6 +202,7 @@ let rec construireNouvDepot (depot : Card.card list) (cardsMoved : Card.card lis
 ;;
 
 (* Normalise l'état actuel, i.e. mets les cartes qui peuvent aller au dépôt, dans le dépôt *)
+
 let normaliserColonnes (etat : etat) =
   let wanted = getCartesPourDepot etat.depot in
   let rec normaliseCol cols newCol cardsMoved =
@@ -216,6 +219,25 @@ let normaliserColonnes (etat : etat) =
   let newDepot = construireNouvDepot etat.depot (snd (newColsAndCardsMoved)) [] in 
   let newCols = fst (newColsAndCardsMoved) in 
   { depot = newDepot; colonnes = newCols; registre = etat.registre; historique = etat.historique } 
+;;
+
+let normaliserRegistre (etat : etat) =
+  let wanted = getCartesPourDepot etat.depot in 
+  let rec normaliseReg registre newReg cardsMoved =
+    match registre with
+    | [] -> (newReg, cardsMoved)
+    | carte :: restant ->
+        if (List.mem carte wanted) = true then normaliseReg restant newReg (carte :: cardsMoved)
+        else normaliseReg restant (carte :: newReg) cardsMoved
+  in let newRegistreAndCardsMoved = normaliseReg etat.registre [] [] in 
+  let newDepot = construireNouvDepot etat.depot (snd (newRegistreAndCardsMoved)) [] in
+  let newRegistre = fst (newRegistreAndCardsMoved) in 
+  { depot = newDepot; colonnes = etat.colonnes; registre = newRegistre; historique = etat.historique } 
+;;
+
+let normaliserGeneral (etat : etat) =
+  let etatColonne = normaliserColonnes etat in 
+  normaliserRegistre etat
 ;;
 
 (* Met à jour l'état actuel, i.e applique le coup à l'état actuel (à appeler seulement si le coup est légal...)*)
