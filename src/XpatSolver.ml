@@ -338,6 +338,42 @@ let lireFichier fichier regles etatInit =
     close_in file
   ;;
 
+let stringToCoup args = 
+  match args with 
+  | [a; b] ->
+    Some { source = (Card.of_num (int_of_string a)) ; destination = b }
+  | _ -> None
+
+
+let lireFichier fichier regles etatInit =
+  let file = open_in fichier in 
+  let etat = etatInit in
+  let iter = 0 in
+
+  try
+    while true do 
+      let ligne = input_line file in 
+      let arguments = String.split_on_char ' ' ligne in 
+      let coupActuel = stringToCoup arguments in
+      let iter = iter + 1 in
+      match coupActuel with 
+      | None -> 
+        let () = print_string "ECHEC " in 
+        let () = print_int iter in 
+        exit 1
+      | Some coupActuel -> 
+      if coupLegal coupActuel regles etat then 
+        let etat = miseAJourPartie coupActuel etat in ()
+      else 
+        let () = print_string "ECHEC " in 
+        let () =print_int iter in 
+        exit 1
+
+    done
+  with End_of_file ->
+    close_in file
+  ;;
+
 (* TODO : La fonction suivante est à adapter et continuer *)
 
 let treat_game conf =
