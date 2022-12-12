@@ -216,6 +216,12 @@ let normaliserGeneral (etat : etat) =
   normaliserRegistre etatColonne
 ;;
 
+let normaliser (etat : etat) =
+  let rec normalRec e1 e2 =
+    if e1.depot = e2.depot then e2 else normalRec e2 (normaliserGeneral e2);
+  in normalRec etat (normaliserGeneral etat)
+;; 
+
 (* Met à jour l'état actuel, i.e applique le coup à l'état actuel (à appeler seulement si le coup est légal...)*)
 let miseAJourPartie (coup : coup) (etat : etat) =
   (*    TODO    *) ()
@@ -334,7 +340,7 @@ let treat_game conf =
   let etat1 = construireEtatInit conf regles paquet in
   printEtat etat1; 
   
-  let etat2 = normaliserGeneral etat1 in
+  let etat2 = normaliser etat1 in
   printEtat etat2;
   
   
