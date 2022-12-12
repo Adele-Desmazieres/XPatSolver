@@ -122,7 +122,7 @@ let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card lis
   
   {
   colonnes = colonnes;
-  depot = [];
+  depot = [(0, Coeur); (0, Carreau); (0, Trefle); (0, Pique)];
   registre = paquet2; (* TODO : vérifier si ca passe de faire ca comme ca *)
   historique = [];
   nbRegistresVides = regles.nbrColonnes - List.length colonnes;
@@ -144,17 +144,17 @@ let respecteEnchainement
     | Carreau | Coeur -> ((suit1 = Trefle || suit1 = Pique) && (rank1 = rank2 - 1))
 ;;
 
-(*
+
 (* Renvoie vrai si la carte représentée par dest est au sommet d'une des colonnes de l'état etat *)
 let estAccessibleSurColonne (etat : etat) (dest : int) =
   let rec colSearcher colonnes dest =
     match colonnes with
     | [] -> false
     | col :: restantes ->
-      let carteSurPile = (Card.of_num (peekPile col)) 
+      let carteSurPile = peekPile col
       in match carteSurPile with
       | None -> colSearcher restantes dest
-      | Some x -> if (Card.of_num x) = dest then true else colSearcher restantes dest
+      | Some x -> if (Card.to_num x) = dest then true else colSearcher restantes dest
   in colSearcher etat.colonnes dest 
 ;;
 
@@ -179,7 +179,7 @@ let possedeColonneVide (etat : etat) =
     match colonnes with
     | [] -> false
     | p :: restantes ->
-      if List.length p = 0 then true else possedePileVide restantes
+      if p.taille = 0 then true else possedePileVide restantes
   in possedePileVide etat.colonnes
 ;;
 
@@ -187,13 +187,18 @@ let possedeColonneVide (etat : etat) =
 let coupLegal (coup : coup) (regles : regles) (etat : etat) =
   (* TODO *)
   match coup.destination with
-  | "V" -> (possedeColonneVide etat) && (estAccessibleGeneral coup.source) 
-  | "T" -> ((List.length etat.registre) < regles.capaciteRegistre) && (estAccessibleGeneral coup.source)
+  | "V" -> (possedeColonneVide etat) && (estAccessibleGeneral etat coup.source) 
+  | "T" -> ((List.length etat.registre) < regles.capaciteRegistre) && (estAccessibleGeneral etat coup.source)
   | x ->
-    let xEval = int_of_string x in
-    (estAccessibleSurColonne etat xEval && respecteEnchainement coup.source (Card.of_num xEval) && (estAccessibleGeneral coup.source))
+    let input = int_of_string x in
+    (estAccessibleSurColonne etat input && respecteEnchainement coup.source (Card.of_num input) regles.enchainement && (estAccessibleGeneral etat coup.source))
 ;; 
-*)
+
+(* Construit une liste des cartes qui sont recherchées pour être ajoutées au dépot *)
+let getCartesPourDepot (depot : Card.card list) =
+  List.map (fun card -> if fst(card) = 13 then card else (fst(card)+1, snd(card))) depot
+;; 
+
 
 let printList l =
   List.iter (
@@ -218,6 +223,15 @@ let rec printColonnes (l : (Card.card pile) list) (num : int) =
     printColonnes l2 (num+1)
 ;; 
 
+(* Construit le nouveau dépot selon les cartes bougées dedans (cardsMoved) *)
+let rec construireNouvDepot (depot : Card.card list) (cardsMoved : Card.card list) nouv =
+  match depot with
+  | [] -> nouv @ cardsMoved
+  | card :: restCards ->
+    if List.for_all (fun x -> snd(x) <> snd(card)) cardsMoved then construireNouvDepot restCards cardsMoved (card :: nouv)
+    else construireNouvDepot restCards cardsMoved nouv
+;;
+
 let printEtat (etat : etat) =
   printCardList etat.registre "registre";
   printCardList etat.depot "depot";
@@ -226,8 +240,42 @@ let printEtat (etat : etat) =
 
 
 (* Normalise l'état actuel, i.e. mets les cartes qui peuvent aller au dépôt, dans le dépôt *)
-let normaliser (etat : etat) =
-  (*  TODO  *) ()
+
+let normaliserColonnes (etat : etat) =
+  let wanted = getCartesPourDepot etat.depot in
+  let rec normaliseCol cols newCol cardsMoved =
+    match cols with
+    | [] -> (newCol, cardsMoved)
+    | p :: l ->
+      let pop = popPile p in
+      match pop with
+      | None -> normaliseCol l (p :: newCol) cardsMoved
+      | Some (card, pile) ->
+        if (List.mem card wanted) = true then normaliseCol l (pile :: newCol) (card :: cardsMoved)
+        else normaliseCol l (p :: newCol) cardsMoved 
+  in let newColsAndCardsMoved =  normaliseCol etat.colonnes [] [] in
+  let newDepot = construireNouvDepot etat.depot (snd (newColsAndCardsMoved)) [] in 
+  let newCols = fst (newColsAndCardsMoved) in 
+  { depot = newDepot; colonnes = newCols; registre = etat.registre; historique = etat.historique } 
+;;
+
+let normaliserRegistre (etat : etat) =
+  let wanted = getCartesPourDepot etat.depot in 
+  let rec normaliseReg registre newReg cardsMoved =
+    match registre with
+    | [] -> (newReg, cardsMoved)
+    | carte :: restant ->
+        if (List.mem carte wanted) = true then normaliseReg restant newReg (carte :: cardsMoved)
+        else normaliseReg restant (carte :: newReg) cardsMoved
+  in let newRegistreAndCardsMoved = normaliseReg etat.registre [] [] in 
+  let newDepot = construireNouvDepot etat.depot (snd (newRegistreAndCardsMoved)) [] in
+  let newRegistre = fst (newRegistreAndCardsMoved) in 
+  { depot = newDepot; colonnes = etat.colonnes; registre = newRegistre; historique = etat.historique } 
+;;
+
+let normaliserGeneral (etat : etat) =
+  let etatColonne = normaliserColonnes etat in 
+  normaliserRegistre etat
 ;;
 
 (* Met à jour l'état actuel, i.e applique le coup à l'état actuel (à appeler seulement si le coup est légal...)*)
@@ -254,6 +302,42 @@ let definirRegles (conf : config) =
   | Baker ->
     {capaciteRegistre = 0; nbrColonnes = 13; distributionCartes = [4]; carteSurColonneVide = None; enchainement = Any}
 
+let stringToCoup args = 
+  match args with 
+  | [a; b] ->
+    Some { source = (Card.of_num (int_of_string a)) ; destination = b }
+  | _ -> None
+
+
+let lireFichier fichier regles etatInit =
+  let file = open_in fichier in 
+  let etat = etatInit in
+  let iter = 0 in
+
+  try
+    while true do 
+      let ligne = input_line file in 
+      let arguments = String.split_on_char ' ' ligne in 
+      let coupActuel = stringToCoup arguments in
+      let iter = iter + 1 in
+      match coupActuel with 
+      | None -> 
+        let () = print_string "ECHEC " in 
+        let () = print_int iter in 
+        exit 1
+      | Some coupActuel -> 
+      if coupLegal coupActuel regles etat then 
+        let etat = miseAJourPartie coupActuel etat in ()
+      else 
+        let () = print_string "ECHEC " in 
+        let () =print_int iter in 
+        exit 1
+
+    done
+  with End_of_file ->
+    close_in file
+  ;;
+
 (* TODO : La fonction suivante est à adapter et continuer *)
 
 let treat_game conf =
@@ -263,11 +347,9 @@ let treat_game conf =
   List.iter (fun n -> print_int n; print_string " ") permut;
   print_newline ();
   print_newline ();
-  List.iter (fun n -> Printf.printf "%s " (Card.to_string (Card.of_num n)))
-    permut;
+  (*List.iter (fun n -> Printf.printf "%s " (Card.to_string (Card.of_num n)))
+    permut; *)
   print_newline ();
-  print_string "\nC'est tout pour l'instant. TODO: continuer...\n";
-  
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
   let etat1 = construireEtatInit conf regles paquet in
