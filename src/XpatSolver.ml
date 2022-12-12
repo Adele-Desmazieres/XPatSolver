@@ -1,4 +1,4 @@
-
+open Format (* printf pour l'affichage *)
 open XpatLib
 
 type game = Freecell | Seahaven | Midnight | Baker
@@ -37,7 +37,7 @@ type coup = {
 
 }
 
-type enchainementCouleur = Alternee | Identique | Toutes 
+type enchainementCouleur = Alternee | Identique | Any 
 
 type regles = {
   capaciteRegistre : int;
@@ -55,11 +55,14 @@ type 'a pile = {
 }
 
 type etat = {
- 
-  colonnes : (Card.card pile) list; (* Colonnes à implémenter en piles (LIFO) *)
+  
+  historique : coup list; (* Liste des coups joués jusqu'à l'obtention de cet état *)
+
+  colonnes : (Card.card pile) list; (* Colonnes à implémenter FArray de Piles *)
   depot : Card.card list; (* Contient une liste des dernieres cartes ajoutées *)
-  registre : Card.card list; (* A implémenter en Set *)
-  historique : coup list;
+  registre : Card.card list; (* Liste ordonnée des cartes au registre *)
+  nbRegistresVides : int;
+  nbColonnesVides : int;
 
 }
 
@@ -122,19 +125,25 @@ let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card lis
   depot = [(0, Coeur); (0, Carreau); (0, Trefle); (0, Pique)];
   registre = paquet2; (* TODO : vérifier si ca passe de faire ca comme ca *)
   historique = [];
+  nbRegistresVides = regles.nbrColonnes - List.length colonnes;
+  nbColonnesVides = regles.capaciteRegistre - List.length paquet2;
   }
 ;;
 
 (* Renvoie vrai si la carte source peut être posée sur la carte dest selon les règles d'enchaînement *)
-let respecteEnchainement (src : Card.card) (dest : Card.card) (enchainement : enchainementCouleur) =
+let respecteEnchainement 
+((rank1, suit1) : Card.card) 
+((rank2, suit2) : Card.card) 
+(enchainement : enchainementCouleur) =
   match enchainement with
-  | Identique -> ((fst(src) = (fst(dest) - 1)) && (snd(src) = snd(dest)))
-  | Toutes -> (fst(src) = (fst(dest) - 1))
+  | Any -> (rank1 = rank2 - 1)
+  | Identique -> ((rank1 = rank2 - 1) && (suit1 = suit2))
   | Alternee ->
-    match snd(dest) with
-    | Trefle | Pique -> ((snd(src) = Carreau || snd(src) = Coeur) && (fst(src) = (fst(dest) - 1)))
-    | Carreau | Coeur -> ((snd(src) = Trefle || snd(src) = Pique) && (fst(src) = (fst(dest) - 1)))
+    match suit2 with
+    | Trefle | Pique -> ((suit1 = Carreau || suit1 = Coeur) && (rank1 = rank2 - 1))
+    | Carreau | Coeur -> ((suit1 = Trefle || suit1 = Pique) && (rank1 = rank2 - 1))
 ;;
+
 
 (* Renvoie vrai si la carte représentée par dest est au sommet d'une des colonnes de l'état etat *)
 let estAccessibleSurColonne (etat : etat) (dest : int) =
@@ -174,8 +183,6 @@ let possedeColonneVide (etat : etat) =
   in possedePileVide etat.colonnes
 ;;
 
-
-
 (* Renvoie vrai si le coup est légal par rapport aux règles et à l'état courant *)
 let coupLegal (coup : coup) (regles : regles) (etat : etat) =
   (* TODO *)
@@ -192,6 +199,30 @@ let getCartesPourDepot (depot : Card.card list) =
   List.map (fun card -> if fst(card) = 13 then card else (fst(card)+1, snd(card))) depot
 ;; 
 
+
+let printList l =
+  List.iter (
+    fun c -> 
+      printf "%s " (Card.to_string c)
+      (*else printf "vide ") *)
+  )
+  l
+;;
+
+let printCardList (l : Card.card list) (name : string) =
+  printf "%s : " name;
+  printList l;
+  printf "\n"
+;;  
+
+let rec printColonnes (l : (Card.card pile) list) (num : int) =
+  match l with
+  |[] -> printf "\n"
+  |pile::l2 -> 
+    printCardList pile.contenu ("c" ^ (string_of_int num));
+    printColonnes l2 (num+1)
+;; 
+
 (* Construit le nouveau dépot selon les cartes bougées dedans (cardsMoved) *)
 let rec construireNouvDepot (depot : Card.card list) (cardsMoved : Card.card list) nouv =
   match depot with
@@ -200,6 +231,13 @@ let rec construireNouvDepot (depot : Card.card list) (cardsMoved : Card.card lis
     if List.for_all (fun x -> snd(x) <> snd(card)) cardsMoved then construireNouvDepot restCards cardsMoved (card :: nouv)
     else construireNouvDepot restCards cardsMoved nouv
 ;;
+
+let printEtat (etat : etat) =
+  printCardList etat.registre "registre";
+  printCardList etat.depot "depot";
+  printColonnes etat.colonnes
+;;
+
 
 (* Normalise l'état actuel, i.e. mets les cartes qui peuvent aller au dépôt, dans le dépôt *)
 
@@ -262,7 +300,43 @@ let definirRegles (conf : config) =
   | Midnight ->
     {capaciteRegistre = 0; nbrColonnes = 18; distributionCartes = [3]; carteSurColonneVide = None; enchainement = Identique}
   | Baker ->
-    {capaciteRegistre = 0; nbrColonnes = 13; distributionCartes = [4]; carteSurColonneVide = None; enchainement = Toutes}
+    {capaciteRegistre = 0; nbrColonnes = 13; distributionCartes = [4]; carteSurColonneVide = None; enchainement = Any}
+
+let stringToCoup args = 
+  match args with 
+  | [a; b] ->
+    Some { source = (Card.of_num (int_of_string a)) ; destination = b }
+  | _ -> None
+
+
+let lireFichier fichier regles etatInit =
+  let file = open_in fichier in 
+  let etat = etatInit in
+  let iter = 0 in
+
+  try
+    while true do 
+      let ligne = input_line file in 
+      let arguments = String.split_on_char ' ' ligne in 
+      let coupActuel = stringToCoup arguments in
+      let iter = iter + 1 in
+      match coupActuel with 
+      | None -> 
+        let () = print_string "ECHEC " in 
+        let () = print_int iter in 
+        exit 1
+      | Some coupActuel -> 
+      if coupLegal coupActuel regles etat then 
+        let etat = miseAJourPartie coupActuel etat in ()
+      else 
+        let () = print_string "ECHEC " in 
+        let () =print_int iter in 
+        exit 1
+
+    done
+  with End_of_file ->
+    close_in file
+  ;;
 
 let stringToCoup args = 
   match args with 
@@ -304,6 +378,7 @@ let lireFichier fichier regles etatInit =
 
 let treat_game conf =
   let permut = XpatRandom.shuffle conf.seed in
+  
   Printf.printf "\nVoici juste la permutation de graine %d:\n" conf.seed;
   List.iter (fun n -> print_int n; print_string " ") permut;
   print_newline ();
@@ -313,10 +388,10 @@ let treat_game conf =
   print_newline ();
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
-  let etatInit = construireEtatInit conf regles paquet in
-  match conf.mode with
-  | Check (s) -> lireFichier s regles etatInit
-  | Search (s) -> exit 0
+  let etat1 = construireEtatInit conf regles paquet in
+  printEtat etat1; (* ERREUR ICI *)
+  exit 0
+;;
 
 let main () =
   Arg.parse
