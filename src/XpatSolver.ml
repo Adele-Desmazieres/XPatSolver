@@ -178,7 +178,6 @@ let rec construireNouvDepot (depot : Card.card list) (cardsMoved : Card.card lis
 
 let normaliserColonnes (etat : etat) =
   let wanted = getCartesPourDepot etat.depot in
-  printCardList wanted "wanted";
   let rec normaliseCol cols newCol cardsMoved =
     match cols with
     | [] -> (newCol, cardsMoved)
@@ -190,11 +189,8 @@ let normaliserColonnes (etat : etat) =
         if (List.mem card wanted) = true then normaliseCol l (pile :: newCol) (card :: cardsMoved)
         else normaliseCol l (p :: newCol) cardsMoved 
   in let newColsAndCardsMoved =  normaliseCol etat.colonnes [] [] in
-  printCardList (snd newColsAndCardsMoved) "to move";
-  printColonnes (fst newColsAndCardsMoved) 0;
   
   let newDepot = construireNouvDepot etat.depot (snd (newColsAndCardsMoved)) [] in 
-  printCardList newDepot "newDepot";
   
   let newCols = fst (newColsAndCardsMoved) in 
   (* TODO supprimer les colonnes vides de la liste *)
@@ -243,9 +239,9 @@ let rec enleverDeCol cols newCol (carte : Card.card) =
     | Some (card, pile) ->
       if card = carte then enleverDeCol l (pile :: newCol) carte
       else enleverDeCol l (p :: newCol) carte
-  ;;
+;;
 
-  (* enlève la carte card du registre *)
+(* enlève la carte card du registre *)
 let rec enleverDeRegistre reg newReg (carte : Card.card)  =
   match reg with
   | [] -> newReg
@@ -256,14 +252,58 @@ let rec enleverDeRegistre reg newReg (carte : Card.card)  =
 let mettreAuRegistre (coup : coup) (etat : etat) =
   if (estDansLeRegistre coup.source etat) then etat else
   let newCols = enleverDeCol etat.colonnes [] coup.source in 
-  let newreg = coup.source :: etat.registre in 
+  let newreg = coup.source::etat.registre in 
   {depot = etat.depot; colonnes = newCols; registre = newreg; historique = etat.historique; nbColMax = etat.nbColMax; nbRegMax = etat.nbRegMax}
 ;;
+
+let rec mettreDansColVideRec oldCols newCols cardToAdd =
+  match oldCols with
+  | [] -> newCols
+  | col::colsRestantes -> match (Pile.peekPile col) with
+    | None -> mettreDansColVideRec colsRestantes ((Pile.pushPile col cardToAdd)::newCols) cardToAdd
+    | Some card -> mettreDansColVideRec colsRestantes (col::newCols) cardToAdd
+;;
+
+let rec mettreDansColRec oldCols newCols cardToAdd cardDestination =
+  match oldCols with
+  | [] -> newCols
+  | col::colsRestantes -> match (Pile.peekPile col) with
+    | None -> mettreDansColRec colsRestantes (col::newCols) cardToAdd cardDestination
+    | Some card -> if card = cardDestination
+      then mettreDansColRec colsRestantes ((Pile.pushPile col card)::newCols) cardToAdd cardDestination
+      else mettreDansColRec colsRestantes (col::newCols) cardToAdd cardDestination
+;;
+
+(* déplace la carte de n'importe ou vers une colonne, renvoie le nouvel état mis à jour *)
+let deplacerDansCol (coup : coup) (etat : etat) (cardnum : int) =
+  
+  let registreMoinsCarte = if (estDansLeRegistre coup.source etat) 
+  then enleverDeRegistre etat.registre [] (Card.of_num cardnum)
+  else etat.registre in
+  
+  let colsMoinsCarte = if (estAccessibleSurColonne etat (Card.to_num coup.source))
+  then enleverDeCol etat.colonnes [] (Card.of_num cardnum)
+  else etat.colonnes in
+    
+  let newCols = if (0 <= cardnum && cardnum <= 51)
+  then mettreDansColRec     etat.colonnes [] coup.source (Card.of_num cardnum)
+  else mettreDansColVideRec etat.colonnes [] coup.source in
+  
+  {historique = etat.historique; 
+	colonnes = newCols; 
+	depot = etat.depot; 
+	registre = registreMoinsCarte;
+	nbColMax = etat.nbColMax;
+	nbRegMax = etat.nbRegMax}
+;;
+
 
 (* Met à jour l'état actuel, i.e applique le coup à l'état actuel (à appeler seulement si le coup est légal...)*)
 let miseAJourPartie (coup : coup) (etat : etat) =
   match coup.destination with 
   | "T" -> mettreAuRegistre coup etat
+  | "V" -> deplacerDansCol coup etat (-1)
+  | cardstring -> let cardnum = int_of_string cardstring in deplacerDansCol coup etat cardnum
 ;;
 
 (* renvoie vrai si le dépot est rempli de rois *)
@@ -300,17 +340,19 @@ let stringToCoup args =
   | _ -> None
 
 
-let rec lireFichier fichier ret =
+let lireFichier fichier =
   let file = open_in fichier in
-  try let line = input_line file in lireFichier fichier (line::ret) with
-  End_of_file -> ret 
+  let rec lecture file ret =
+    try let line = input_line file in lecture file (line::ret) with
+    End_of_file -> ret 
+  in lecture file []
 ;;
 
 let stringToCoup args = 
   match args with 
   | [a; b] ->
-    Some { source = (Card.of_num (int_of_string a)) ; destination = b }
-  | _ -> None
+     { source = (Card.of_num (int_of_string a)) ; destination = b }
+  | _ -> failwith "Wrong coup"
 
 let rec stringListToCoups list ret =
   match list with
@@ -326,9 +368,11 @@ let rec bouclePrincipale etatCourant regles coupsList iter =
   | coup :: coupsRestants ->
     if coupLegal coup regles etatCourant
       then let newEtat = miseAJourPartie coup etatCourant in 
+          printEtat newEtat;
            let newEtatNormalise = normaliser newEtat in 
+           printEtat newEtatNormalise;
            bouclePrincipale newEtatNormalise regles coupsRestants (iter + 1)
-      else let () = print_string "ECHEC " in let () = print_int iter in exit 1
+      else let () = print_string "ECHEC " in let () = print_int iter in let () = print_newline () in exit 1
 ;;
 
 
@@ -338,28 +382,41 @@ let rec bouclePrincipale etatCourant regles coupsList iter =
 let treat_game conf =
   let permut = XpatRandom.shuffle conf.seed in
   
-  Printf.printf "\nVoici juste la permutation de graine %d:\n" conf.seed;
+  (*Printf.printf "\nVoici juste la permutation de graine %d:\n" conf.seed;*)
   
   (*printf "%s " (Card.to_string c)*)
-  List.iter (fun n -> printf "%s " (Card.to_string (Card.of_num n))) permut;
+  (*List.iter (fun n -> printf "%s " (Card.to_string (Card.of_num n))) permut;*)
   
-  print_newline ();
+  (*print_newline ();
   print_newline ();
   (*List.iter (fun n -> Printf.printf "%s " (Card.to_string (Card.of_num n)))
     permut; *)
-  print_newline ();
+  print_newline ();*)
   
   
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
   let etat1 = construireEtatInit conf regles paquet in
-  printEtat etat1; 
+  let () = printEtat etat1 in
   
   let etat2 = normaliser etat1 in
   printEtat etat2;
   
+  printf "%b " (coupLegal {source = Card.of_num 6; destination = "T"} regles etat2);
+  let etat3 = miseAJourPartie {source = Card.of_num 6; destination = "T"} etat2 in 
+  let etat3 = normaliser etat3 in
+  printEtat etat3;
   
-  exit 0
+  printf "%b " (coupLegal {source = Card.of_num 33; destination = "38"} regles etat3);
+  let etat4 = miseAJourPartie {source = Card.of_num 33; destination = "38"} etat3 in
+  let etat4 = normaliser etat4 in 
+  printEtat etat4
+ (* match conf.mode with
+  | Search (s) -> exit 0
+  | Check (s) -> 
+    let listeCoups = stringListToCoups (lireFichier s) [] in
+    bouclePrincipale etat2 regles listeCoups 1 *)
+  
 ;;
 
 let main () =
@@ -371,5 +428,6 @@ let main () =
     set_game_seed (* pour les arguments seuls, sans option devant *)
     "XpatSolver <game>.<number> : search solution for Xpat2 game <number>";
   treat_game config
+  
 
 let _ = if not !Sys.interactive then main () else ()
