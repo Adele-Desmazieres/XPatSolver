@@ -49,6 +49,7 @@ type regles = {
    repositionne bien les rois si Baker's Dozen *)
 let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card list) =
 
+  (* TODO: Mettre les rois au fond pour baker's dozen*)
   let construireColonnes =
     (*let paquetPile = listToPile paquet in*)
     
@@ -138,11 +139,20 @@ let possedeColonneVide (etat : etat) =
   in possedePileVide etat.colonnes
 ;;
 
+(* Renvoie vrai si la carte src peut être placée sur une colonne vide selon les règles du jeu *)
+let respecteColonneVide (src : Card.card) (regles : regles) =
+  match regles.carteSurColonneVide with
+  | None -> false
+  | Some x ->
+    match x with
+    | None -> true
+    | Some rang -> (rang = fst(src))
+
 (* Renvoie vrai si le coup est légal par rapport aux règles et à l'état courant *)
 let coupLegal (coup : coup) (regles : regles) (etat : etat) =
   (* TODO *)
   match coup.destination with
-  | "V" -> (possedeColonneVide etat) && (estAccessibleGeneral etat coup.source) 
+  | "V" -> (estAccessibleGeneral etat coup.source) && (possedeColonneVide etat) && (respecteColonneVide coup.source regles)
   | "T" -> ((List.length etat.registre) < regles.capaciteRegistre) && (estAccessibleGeneral etat coup.source)
   | x ->
     let input = int_of_string x in
@@ -222,9 +232,46 @@ let normaliser (etat : etat) =
   in normalRec etat (normaliserGeneral etat)
 ;; 
 
+(* Enlève la carte card des colonnes *)
+let rec enleverDeCol cols newCol (carte : Card.card) =
+  match cols with
+  | [] -> newCol
+  | p :: l ->
+    let pop = Pile.popPile p in
+    match pop with
+    | None -> enleverDeCol l (p :: newCol) carte
+    | Some (card, pile) ->
+      if card = carte then enleverDeCol l (pile :: newCol) carte
+      else enleverDeCol l (p :: newCol) carte
+  ;;
+
+  (* enlève la carte card du registre *)
+let rec enleverDeRegistre reg newReg (carte : Card.card)  =
+  match reg with
+  | [] -> newReg
+  | x :: rest -> if x = carte then enleverDeRegistre rest newReg carte else enleverDeRegistre rest (x::newReg) carte
+;;
+
+(* enlève la carte src des colonnes et la met au registre *)
+let mettreAuRegistre (coup : coup) (etat : etat) =
+  if (estDansLeRegistre coup.source etat) then etat else
+  let newCols = enleverDeCol etat.colonnes [] coup.source in 
+  let newreg = coup.source :: etat.registre in 
+  {depot = etat.depot; colonnes = newCols; registre = newreg; historique = etat.historique; nbColMax = etat.nbColMax; nbRegMax = etat.nbRegMax}
+;;
+
 (* Met à jour l'état actuel, i.e applique le coup à l'état actuel (à appeler seulement si le coup est légal...)*)
 let miseAJourPartie (coup : coup) (etat : etat) =
-  (*    TODO    *) ()
+  match coup.destination with 
+  | "T" -> mettreAuRegistre coup etat
+;;
+
+(* renvoie vrai si le dépot est rempli de rois *)
+let rec conditionDeVictoire depot =
+  match depot with
+  | [] -> true
+  | carte :: rest ->
+    if (fst(carte) < 13) then false else conditionDeVictoire rest
 ;;
 
 (* Transforme la permutation en liste de cartes : ATTENTION inverse l'ordre*)
@@ -253,34 +300,11 @@ let stringToCoup args =
   | _ -> None
 
 
-let lireFichier fichier regles etatInit =
-  let file = open_in fichier in 
-  let etat = etatInit in
-  let iter = 0 in
-
-  try
-    while true do 
-      let ligne = input_line file in 
-      let arguments = String.split_on_char ' ' ligne in 
-      let coupActuel = stringToCoup arguments in
-      let iter = iter + 1 in
-      match coupActuel with 
-      | None -> 
-        let () = print_string "ECHEC " in 
-        let () = print_int iter in 
-        exit 1
-      | Some coupActuel -> 
-      if coupLegal coupActuel regles etat then 
-        let etat = miseAJourPartie coupActuel etat in ()
-      else 
-        let () = print_string "ECHEC " in 
-        let () =print_int iter in 
-        exit 1
-
-    done
-  with End_of_file ->
-    close_in file
-  ;;
+let rec lireFichier fichier ret =
+  let file = open_in fichier in
+  try let line = input_line file in lireFichier fichier (line::ret) with
+  End_of_file -> ret 
+;;
 
 let stringToCoup args = 
   match args with 
@@ -288,35 +312,26 @@ let stringToCoup args =
     Some { source = (Card.of_num (int_of_string a)) ; destination = b }
   | _ -> None
 
+let rec stringListToCoups list ret =
+  match list with
+  | [] -> ret
+  | x :: rest -> stringListToCoups rest (stringToCoup (String.split_on_char ' ' x) :: ret)
+;;
 
-let lireFichier fichier regles etatInit =
-  let file = open_in fichier in 
-  let etat = etatInit in
-  let iter = 0 in
+let rec bouclePrincipale etatCourant regles coupsList iter =
+  match coupsList with 
+  | [] -> if conditionDeVictoire etatCourant.depot
+    then let () = print_string "SUCCES" in exit 0
+    else let () = print_string "ECHEC " in let () = print_int iter in exit 1
+  | coup :: coupsRestants ->
+    if coupLegal coup regles etatCourant
+      then let newEtat = miseAJourPartie coup etatCourant in 
+           let newEtatNormalise = normaliser newEtat in 
+           bouclePrincipale newEtatNormalise regles coupsRestants (iter + 1)
+      else let () = print_string "ECHEC " in let () = print_int iter in exit 1
+;;
 
-  try
-    while true do 
-      let ligne = input_line file in 
-      let arguments = String.split_on_char ' ' ligne in 
-      let coupActuel = stringToCoup arguments in
-      let iter = iter + 1 in
-      match coupActuel with 
-      | None -> 
-        let () = print_string "ECHEC " in 
-        let () = print_int iter in 
-        exit 1
-      | Some coupActuel -> 
-      if coupLegal coupActuel regles etat then 
-        let etat = miseAJourPartie coupActuel etat in ()
-      else 
-        let () = print_string "ECHEC " in 
-        let () =print_int iter in 
-        exit 1
 
-    done
-  with End_of_file ->
-    close_in file
-  ;;
 
 (* TODO : La fonction suivante est à adapter et continuer *)
 
