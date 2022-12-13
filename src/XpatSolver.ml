@@ -260,7 +260,7 @@ let rec mettreDansColVideRec oldCols newCols cardToAdd =
   match oldCols with
   | [] -> newCols
   | col::colsRestantes -> match (Pile.peekPile col) with
-    | None -> mettreDansColVideRec colsRestantes ((Pile.pushPile col cardToAdd)::newCols) cardToAdd
+    | None -> colsRestantes @ ((Pile.pushPile col cardToAdd)::newCols)
     | Some card -> mettreDansColVideRec colsRestantes (col::newCols) cardToAdd
 ;;
 
@@ -270,7 +270,7 @@ let rec mettreDansColRec oldCols newCols cardToAdd cardDestination =
   | col::colsRestantes -> match (Pile.peekPile col) with
     | None -> mettreDansColRec colsRestantes (col::newCols) cardToAdd cardDestination
     | Some card -> if card = cardDestination
-      then mettreDansColRec colsRestantes ((Pile.pushPile col card)::newCols) cardToAdd cardDestination
+      then mettreDansColRec colsRestantes ((Pile.pushPile col cardToAdd)::newCols) cardToAdd cardDestination
       else mettreDansColRec colsRestantes (col::newCols) cardToAdd cardDestination
 ;;
 
@@ -278,16 +278,20 @@ let rec mettreDansColRec oldCols newCols cardToAdd cardDestination =
 let deplacerDansCol (coup : coup) (etat : etat) (cardnum : int) =
   
   let registreMoinsCarte = if (estDansLeRegistre coup.source etat) 
-  then enleverDeRegistre etat.registre [] (Card.of_num cardnum)
+  then enleverDeRegistre etat.registre [] (coup.source)
   else etat.registre in
   
   let colsMoinsCarte = if (estAccessibleSurColonne etat (Card.to_num coup.source))
-  then enleverDeCol etat.colonnes [] (Card.of_num cardnum)
+  then enleverDeCol etat.colonnes [] (coup.source)
   else etat.colonnes in
+  (*print_string (Card.to_string (coup.source));
+  print_newline ();
+  print_string (Card.to_string (Card.of_num(cardnum)));
+  print_newline ();*)
     
   let newCols = if (0 <= cardnum && cardnum <= 51)
-  then mettreDansColRec     etat.colonnes [] coup.source (Card.of_num cardnum)
-  else mettreDansColVideRec etat.colonnes [] coup.source in
+  then mettreDansColRec     colsMoinsCarte [] coup.source (Card.of_num cardnum)
+  else mettreDansColVideRec colsMoinsCarte [] coup.source in
   
   {historique = etat.historique; 
 	colonnes = newCols; 
@@ -361,16 +365,17 @@ let rec stringListToCoups list ret =
 ;;
 
 let rec bouclePrincipale etatCourant regles coupsList iter =
+  (* printEtat etatCourant; *)
   match coupsList with 
   | [] -> if conditionDeVictoire etatCourant.depot
-    then let () = print_string "SUCCES" in exit 0
+    then (print_string "SUCCES" ; print_newline ();  exit 0)
     else let () = print_string "ECHEC " in let () = print_int iter in exit 1
   | coup :: coupsRestants ->
     if coupLegal coup regles etatCourant
       then let newEtat = miseAJourPartie coup etatCourant in 
-          printEtat newEtat;
+          (*printEtat newEtat;*)
            let newEtatNormalise = normaliser newEtat in 
-           printEtat newEtatNormalise;
+           (*printEtat newEtatNormalise;*)
            bouclePrincipale newEtatNormalise regles coupsRestants (iter + 1)
       else let () = print_string "ECHEC " in let () = print_int iter in let () = print_newline () in exit 1
 ;;
@@ -397,25 +402,26 @@ let treat_game conf =
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
   let etat1 = construireEtatInit conf regles paquet in
-  let () = printEtat etat1 in
+  (*let () = printEtat etat1 in*)
   
   let etat2 = normaliser etat1 in
-  printEtat etat2;
+  (*printEtat etat2;*)
   
-  printf "%b " (coupLegal {source = Card.of_num 6; destination = "T"} regles etat2);
+  (*printf "%b " (coupLegal {source = Card.of_num 6; destination = "T"} regles etat2);*)
   let etat3 = miseAJourPartie {source = Card.of_num 6; destination = "T"} etat2 in 
   let etat3 = normaliser etat3 in
-  printEtat etat3;
+  (*printEtat etat3;
   
-  printf "%b " (coupLegal {source = Card.of_num 33; destination = "38"} regles etat3);
+  printf "Int of string de 38 %d \n" (int_of_string "38");
+  printf "%b " (coupLegal {source = Card.of_num 33; destination = "38"} regles etat3);*)
   let etat4 = miseAJourPartie {source = Card.of_num 33; destination = "38"} etat3 in
   let etat4 = normaliser etat4 in 
-  printEtat etat4
- (* match conf.mode with
+  (*printEtat etat4*)
+  match conf.mode with
   | Search (s) -> exit 0
   | Check (s) -> 
     let listeCoups = stringListToCoups (lireFichier s) [] in
-    bouclePrincipale etat2 regles listeCoups 1 *)
+    bouclePrincipale etat2 regles listeCoups 1
   
 ;;
 
