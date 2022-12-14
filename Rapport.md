@@ -79,22 +79,22 @@ Après avoir mis en place le git du projet, nous nous sommes accordé sur la man
 
 - les colonnes de cartes : une liste de piles de cartes
 - les colonnes vides : un entier représentant leur nombre
-- les registres : 
-- les dépôts : 
+- les registres : une liste de cartes
+- les dépôts : idem, mais celle ci contient seulement la dernière carte déposée de chaque couleur
 
 Nous gardons à l'esprit la possibilité d'en changer si d'autres options se révélaient plus efficace. 
 
-###### Planification temporelle
-
-*TODO : faire genre on a planifié dans le temps*
-
-#### Semaine 48
+#### Semaine 47
 
 Mattéo a programmé les permutations de cartes pseudo-aléatoires du fichier [src/XpatRandom.ml](), générées à partir de l'entier appelé graine. Nous avons eu des difficultés à obtenir les permutations attendues, jusqu'à ce qu'on puisse comparer nos résultats intermédiaires avec ceux donnés pour la graine 1. Adèle a programmé l'initialisation d'une partie et la distribution des cartes dans [src/XpatSolver.ml](). 
 
-#### Semaine 49
+#### Semaine 48
 
 Adèle a débuté l'écriture du rapport. 
+
+### Semmaine 50
+
+Mattéo a implémenté les fonctions de normalisation d'état ainsi que de vérification de la légalité d'un coup donné.
 
 ### Divers
 *TODO : Cette partie est entièrement libre : remarques, suggestions, questions...*
