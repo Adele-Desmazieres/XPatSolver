@@ -43,24 +43,48 @@ type regles = {
 }
 
 
-(* Faire en sorte que regles contiennent toutes les tailles de colonnes, dont les vides *)
+(* Descendre les rois au fond d'une pile *)
+let descendreCarte (p : Card.card Pile.pile) (rankSearch : int) : Card.card Pile.pile =
+  Pile.{ 
+    contenu = 
+      (List.filter_map 
+        (fun (rank, suit) -> if (rank <> rankSearch) then Some (rank, suit) else None) 
+        p.contenu)
+      @ 
+      (List.filter_map 
+        (fun (rank, suit) -> if (rank = rankSearch) then Some (rank, suit) else None)
+        p.contenu); 
+        
+    taille = p.taille }
+;;
+  
 
-(* Construit l'état initial de la partie : place les cartes dans les colonnes (et registres si nécéssaire)
-   repositionne bien les rois si Baker's Dozen *)
+(* Construit l'état initial de la partie : place les cartes dans les colonnes 
+(et registres si nécessaire)
+et repositionne bien les rois si Baker's Dozen *)
 let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card list) =
-
-  (* TODO: Mettre les rois au fond pour baker's dozen*)
+  
+  (* Fonction auxiliaire construisant la liste des piles de cartes
+  représentant l'ensemble des colonnes *)
   let construireColonnes =
-    (*let paquetPile = listToPile paquet in*)
     
+    (* Renvoie une colonne remplie avec ses cartes initiales. 
+    Prend en argument le nb de cartes à ajouter dans cette colonnes, 
+    une pile accumulatrice de cartes dans la colonne, et le reste du paquet *)
     let rec oneColonneInit (nbToAdd : int) (col : Card.card Pile.pile) (paquet : Card.card list) =
-      if (nbToAdd = 0) then (col, paquet)
-      else (* let (carte, paquet2) = popPile paquet in*)
+      if (nbToAdd = 0) then 
+        (* Descendre les rois dans les colonnes si c'est Bakers Dozen, 
+        sinon renvoie la colonne prête et le reste du paquet de cartes non-distribuées *)
+        if (config.game = Baker) then ( (descendreCarte col 13), paquet)
+        else (col, paquet)
+        
+      else (* Sinon pousser successivement les cartes du paquet sur la colonne *)
       match paquet with 
       | [] -> failwith "Paquet vide, distribution impossible. "
       | carte::paquet2 -> oneColonneInit (nbToAdd-1) (Pile.pushPile col carte) paquet2
     in 
     
+    (* Renvoie l'ensemble des colonnes remplies de cartes. *)
     let rec aux (cols : Card.card Pile.pile list) (colDistrib : int list) (paquet : Card.card list) =
       match colDistrib with
       | [] -> (cols, paquet)
@@ -68,7 +92,6 @@ let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card lis
         let (col, paq2) = oneColonneInit nbCartes Pile.newPile paquet in 
         aux (col::cols) colDistrib2 paq2
       
-      (*oneColonneInit regles.distributionCartes.get(x) newPile*)
     in
     aux [] regles.distributionCartes paquet
     
