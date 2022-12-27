@@ -57,6 +57,7 @@ let descendreCarte (p : Card.card Pile.pile) (rankSearch : int) : Card.card Pile
         
     taille = p.taille }
 ;;
+
   
 
 (* Construit l'état initial de la partie : place les cartes dans les colonnes 
@@ -386,6 +387,35 @@ let rec stringListToCoups list ret =
   | [] -> ret
   | x :: rest -> stringListToCoups rest (stringToCoup (String.split_on_char ' ' x) :: ret)
 ;;
+
+
+(* PARTIE 2.3  : ensembles d'états *)
+
+let rec compRegistres reg1 etat2 =
+  match reg1 with
+  | [] -> true 
+  | carte :: rest ->
+    if estDansLeRegistre carte etat2 then compRegistres rest etat2 else false
+;;
+
+let compColonnes etat1 etat2 =
+  let rec compColonneSeule cols1 cols2 =
+    match cols1 with
+    | [] -> if cols2 = [] then true else false
+    | pile1 :: rest1 ->
+      match cols2 with
+      | [] -> false
+      | pile2 :: rest2 ->
+        if Pile.equalsPile pile1 pile2 then compColonneSeule rest1 rest2 else false
+  in compColonneSeule etat1.colonnes etat2.colonnes
+;; 
+
+let compEtat etat1 etat2 =
+  if not (compRegistres etat1.registre etat2) then 1
+  else if compColonnes etat1 etat2 then 0 else 1
+;;
+  
+module States = Set.Make (struct type t = etat let compare = compEtat end)
 
 let rec bouclePrincipale etatCourant regles coupsList iter =
   (* printEtat etatCourant; *)

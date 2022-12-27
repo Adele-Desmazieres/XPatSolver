@@ -10,3 +10,4 @@ val newPile : 'a pile
 val popPile : 'a pile -> ('a * 'a pile) option
 val pushPile : 'a pile -> 'a -> 'a pile
 val peekPile : 'a pile -> 'a option
+val equalsPile : 'a pile -> 'a pile -> bool

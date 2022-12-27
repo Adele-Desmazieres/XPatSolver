@@ -26,3 +26,6 @@ let peekPile (p : 'a pile) =
   | [] -> None
   | e::c2 -> Some e
 ;;
+
+let equalsPile (p1 : 'a pile) (p2 : 'a pile) = p1.contenu = p2.contenu
+;;
