@@ -399,15 +399,13 @@ let rec compRegistres reg1 etat2 =
 ;;
 
 let compColonnes etat1 etat2 =
-  let rec compColonneSeule cols1 cols2 =
-    match cols1 with
-    | [] -> if cols2 = [] then true else false
-    | pile1 :: rest1 ->
-      match cols2 with
-      | [] -> false
-      | pile2 :: rest2 ->
-        if Pile.equalsPile pile1 pile2 then compColonneSeule rest1 rest2 else false
-  in compColonneSeule etat1.colonnes etat2.colonnes
+  let rec compColonneSeule col cols2 =
+    match cols2 with
+    |[] -> true
+    | p :: rest ->
+      if List.mem p cols2 then compColonneSeule col rest else false
+  in let compColonneSingle col = compColonneSeule col etat2.colonnes  
+  in List.for_all (compColonneSingle) etat1.colonnes
 ;; 
 
 let compEtat etat1 etat2 =
