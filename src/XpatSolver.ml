@@ -107,6 +107,7 @@ let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card lis
   historique = [];
   nbColMax = regles.nbrColonnes;
   nbRegMax = regles.capaciteRegistre;
+  score = 0;
   }
 ;;
 
@@ -183,6 +184,36 @@ let coupLegal (coup : coup) (regles : regles) (etat : etat) =
     (estAccessibleSurColonne etat input && respecteEnchainement coup.source (Card.of_num input) regles.enchainement && (estAccessibleGeneral etat coup.source))
 ;; 
 
+(* Renvoie vrai si la carte carte est seule sur sa colonne *)
+let estSeuleSurColonne (carte : Card.card) etat =
+  let rec parcoursCol cols (carte : Card.card) =
+    match cols with
+    | [] -> false
+    | p :: rest ->
+      if ((Pile.peekPile p) = Some carte) && (p.Pile.taille = 1) then true else parcoursCol rest carte
+  in parcoursCol etat.colonnes carte
+;;
+
+(* Renvoie vrai si le coup n'est pas stupide *)
+let coupPasStupide (coup : coup) (regles : regles) (etat : etat) =
+  match coup.destination with 
+  | "T" -> (not (estDansLeRegistre coup.source etat))
+  | "V" -> (not (estSeuleSurColonne coup.source etat))
+  | x -> true
+
+(* Renvoie une liste de coups légaux pour une carte source, un état et des règles donnés *)
+let coupLegalSrc (source : Card.card) (regles : regles) (etat : etat) =
+  let rec legal_rec source dests regles etat ret =
+    match dests with
+    | [] -> ret
+    | dest :: rest ->
+      let coup = { source = source; destination = dest } in
+      if coupLegal coup regles etat && coupPasStupide coup regles etat then legal_rec source rest regles etat (coup :: ret)
+      else legal_rec source rest regles etat ret
+  in let paquet = ("T" :: "V" :: (List.map (fun x -> string_of_int x) (List.init 52 (fun x -> x))))
+  in legal_rec source paquet regles etat []
+;;
+
 (* Construit une liste des cartes qui sont recherchées pour être ajoutées au dépot *)
 let getCartesPourDepot (depot : Card.card list) =
   List.map (fun card -> if fst(card) = 13 then card else (fst(card)+1, snd(card))) depot
@@ -215,12 +246,14 @@ let normaliserColonnes (etat : etat) =
   in let newColsAndCardsMoved =  normaliseCol etat.colonnes [] [] in
   
   let newDepot = construireNouvDepot etat.depot (snd (newColsAndCardsMoved)) [] in 
+  let newScore = List.length (snd(newColsAndCardsMoved)) in
   
   let newCols = fst (newColsAndCardsMoved) in 
   (* TODO supprimer les colonnes vides de la liste *)
   { depot = newDepot; colonnes = newCols; registre = etat.registre; historique = etat.historique; 
   nbColMax = etat.nbColMax;
   nbRegMax = etat.nbRegMax;
+  score = etat.score + newScore;
   } 
 ;;
 
@@ -234,10 +267,12 @@ let normaliserRegistre (etat : etat) =
         else normaliseReg restant (carte :: newReg) cardsMoved
   in let newRegistreAndCardsMoved = normaliseReg etat.registre [] [] in 
   let newDepot = construireNouvDepot etat.depot (snd (newRegistreAndCardsMoved)) [] in
+  let newScore = List.length (snd(newRegistreAndCardsMoved)) in
   let newRegistre = fst (newRegistreAndCardsMoved) in 
   { depot = newDepot; colonnes = etat.colonnes; registre = newRegistre; historique = etat.historique;
   nbColMax = etat.nbColMax;
   nbRegMax = etat.nbRegMax;
+  score = etat.score + newScore;
   } 
 ;;
 
@@ -277,7 +312,7 @@ let mettreAuRegistre (coup : coup) (etat : etat) =
   if (estDansLeRegistre coup.source etat) then etat else
   let newCols = enleverDeCol etat.colonnes [] coup.source in 
   let newreg = coup.source::etat.registre in 
-  {depot = etat.depot; colonnes = newCols; registre = newreg; historique = etat.historique; nbColMax = etat.nbColMax; nbRegMax = etat.nbRegMax}
+  {depot = etat.depot; colonnes = newCols; registre = newreg; historique = (coup :: etat.historique); nbColMax = etat.nbColMax; nbRegMax = etat.nbRegMax; score = etat.score}
 ;;
 
 let rec mettreDansColVideRec oldCols newCols cardToAdd =
@@ -317,12 +352,13 @@ let deplacerDansCol (coup : coup) (etat : etat) (cardnum : int) =
   then mettreDansColRec     colsMoinsCarte [] coup.source (Card.of_num cardnum)
   else mettreDansColVideRec colsMoinsCarte [] coup.source in
   
-  {historique = etat.historique; 
+  {historique = (coup :: etat.historique); 
 	colonnes = newCols; 
 	depot = etat.depot; 
 	registre = registreMoinsCarte;
 	nbColMax = etat.nbColMax;
-	nbRegMax = etat.nbRegMax}
+	nbRegMax = etat.nbRegMax;
+  score = etat.score}
 ;;
 
 
@@ -376,6 +412,16 @@ let lireFichier fichier =
   in lecture file []
 ;;
 
+let ecrireCoupsDansFichier coups fichier =
+  let file = open_out fichier in 
+  let rec ecriture file coups = 
+    match coups with 
+    |[] -> ()
+    | coup :: rest -> let () = Printf.fprintf file "%s %s\n" (Card.to_string(coup.source)) coup.destination
+      in ecriture file rest 
+  in ecriture file coups 
+;;
+
 let stringToCoup args = 
   match args with 
   | [a; b] ->
@@ -387,6 +433,25 @@ let rec stringListToCoups list ret =
   | [] -> ret
   | x :: rest -> stringListToCoups rest (stringToCoup (String.split_on_char ' ' x) :: ret)
 ;;
+
+(* PARTIE 2.2 : recherche de solutions *)
+
+(* Pour un etat donné, créé une liste de (coup, etatResultant) possibles pour toutes les cartes de l'état *)
+let creerListeDeCoupsPossible etat regles =
+  let rec parcoursCol cols regles etat ret =
+    match cols with
+    |[] -> ret
+    | p :: rest ->
+      match Pile.peekPile p with
+      | None -> parcoursCol rest regles etat ret
+      | Some carte ->
+        parcoursCol rest regles etat (List.rev_append ret (coupLegalSrc carte regles etat))
+  in let ret = parcoursCol etat.colonnes regles etat [] in 
+  let retReg = List.flatten (List.map (fun x -> coupLegalSrc x regles etat) etat.registre) 
+  in let listeCoups = List.rev_append retReg ret
+  in let listeEtatsDonnes = List.map (fun x -> miseAJourPartie x etat) listeCoups
+  in List.combine listeCoups listeEtatsDonnes
+;; 
 
 
 (* PARTIE 2.3  : ensembles d'états *)
@@ -418,7 +483,7 @@ module States = Set.Make (struct type t = etat let compare = compEtat end)
 let rec bouclePrincipale etatCourant regles coupsList iter =
   (* printEtat etatCourant; *)
   match coupsList with 
-  | [] -> if conditionDeVictoire etatCourant.depot
+  | [] -> if etatCourant.score = 52
     then (print_string "SUCCES" ; print_newline ();  exit 0)
     else let () = print_string "ECHEC " in let () = print_int iter in exit 1
   | coup :: coupsRestants ->
