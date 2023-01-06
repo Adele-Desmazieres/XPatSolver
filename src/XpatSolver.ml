@@ -211,7 +211,7 @@ let coupLegalSrc (source : Card.card) (regles : regles) (etat : etat) =
       if coupLegal coup regles etat && coupPasStupide coup regles etat then legal_rec source rest regles etat (coup :: ret)
       else legal_rec source rest regles etat ret
   in let paquet = ("T" :: "V" :: (List.map (fun x -> string_of_int x) (List.init 52 (fun x -> x))))
-  in legal_rec source paquet regles etat []
+  in legal_rec source (List.rev paquet) regles etat []
 ;;
 
 (* Construit une liste des cartes qui sont recherchées pour être ajoutées au dépot *)
@@ -284,7 +284,16 @@ let normaliserGeneral (etat : etat) =
 let normaliser (etat : etat) =
   let rec normalRec e1 e2 =
     if e1.depot = e2.depot then e2 else normalRec e2 (normaliserGeneral e2);
-  in normalRec etat (normaliserGeneral etat)
+  in let etatNormalise = normalRec etat (normaliserGeneral etat)
+  in {
+    colonnes = etatNormalise.colonnes;
+    historique = etatNormalise.historique;
+    score = etatNormalise.score;
+    depot = etatNormalise.depot;
+    nbRegMax = etatNormalise.nbRegMax;
+    nbColMax = etatNormalise.nbColMax;
+    registre = List.sort (fun x y -> Stdlib.compare (Card.to_num x) (Card.to_num y) ) etatNormalise.registre;
+  } 
 ;; 
 
 (* Enlève la carte card des colonnes *)
@@ -449,39 +458,36 @@ let creerListeDeCoupsPossible etat regles =
   in let ret = parcoursCol etat.colonnes regles etat [] in 
   let retReg = List.flatten (List.map (fun x -> coupLegalSrc x regles etat) etat.registre) 
   in let listeCoups = List.rev_append retReg ret
+  (*in let () = List.iter (fun x -> let () = print_string(Card.to_string x.source)in let () = print_string("  ") in
+                  match x.destination with
+                  | "T"-> print_string "T"; print_newline ()
+                  | "V"-> print_string "V"; print_newline ()
+                  | (x:string) -> print_string (Card.to_string (Card.of_num (int_of_string x))); print_newline () ) listeCoups *)
+  
   in let listeEtatsDonnes = List.map (fun x -> normaliser (miseAJourPartie x etat)) listeCoups
-  in List.combine listeCoups listeEtatsDonnes
+  in listeEtatsDonnes
 ;; 
 
 
 (* PARTIE 2.3  : ensembles d'états *)
 
-let rec compRegistres reg1 etat2 =
-  match reg1 with
-  | [] -> true 
-  | carte :: rest ->
-    if estDansLeRegistre carte etat2 then compRegistres rest etat2 else false
+let compRegistres etat1 etat2 =
+  Stdlib.compare etat1.registre etat2.registre
 ;;
 
 let compColonnes etat1 etat2 =
-  let rec compColonneSeule col cols2 =
-    match cols2 with
-    |[] -> true
-    | p :: rest ->
-      if List.mem p cols2 then compColonneSeule col rest else false
-  in let compColonneSingle col = compColonneSeule col etat2.colonnes  
-  in List.for_all (compColonneSingle) etat1.colonnes
+  Stdlib.compare etat1.colonnes etat2.colonnes
 ;; 
 
 let compEtat etat1 etat2 =
-  if not (compRegistres etat1.registre etat2) then 1
-  else if compColonnes etat1 etat2 then 0 else 1
+  let comp1 = (compRegistres etat1 etat2) in
+  if (comp1 = 0) then compColonnes etat1 etat2 else comp1
 ;;
   
 module States = Set.Make (struct type t = etat let compare = compEtat end)
 
 let rec bouclePrincipaleVerif etatCourant regles coupsList iter =
-  (* printEtat etatCourant; *)
+  (*printEtat etatCourant;*) 
   match coupsList with 
   | [] -> if etatCourant.score = 52
     then (print_string "SUCCES" ; print_newline ();  exit 0)
@@ -495,6 +501,47 @@ let rec bouclePrincipaleVerif etatCourant regles coupsList iter =
            bouclePrincipaleVerif newEtatNormalise regles coupsRestants (iter + 1)
       else let () = print_string "ECHEC " in let () = print_int iter in let () = print_newline () in exit 1
 ;;
+
+(* Parcours en profondeur sur le graphe des états du jeu *)
+let rec dfs etatCourant (etatsParcourus : States.t ) regles =
+ (*printEtat etatCourant;*)
+  (* condition de terminaison *)
+  if (etatCourant.score = 52) then (etatsParcourus, Some etatCourant) else
+  (* On ajoute l'état courant aux états parcourus *)
+  let etatsParcourus = (States.add etatCourant etatsParcourus) in 
+  (* On récupère les voisins *)
+  let etatsAtteignables = creerListeDeCoupsPossible etatCourant regles in
+(*let () = List.iter (fun x -> printEtat x) etatsAtteignables in*)
+  (* On itère sur les voisins *)
+  let rec iterListeEtats (etatsAParcourir : Etat.etat list) (etatsParcourus : States.t)=
+    match etatsAParcourir with
+    (* Si on atteint la fin de la liste de voisins alors on est sur une branche d'échec *)
+    | [] -> (etatsParcourus , None)
+    | etat :: etatsRestants ->
+
+    (* let () = printEtat etat in
+     let () = print_bool (States.mem etat etatsParcourus) in *)
+      (* Si on trouve un voisin, alors on appelle DFS dessus et on récupère son Set de mémoire *)
+      if States.mem etat etatsParcourus then (* let () = print_string ("Dommje"); print_newline () in *) iterListeEtats etatsRestants etatsParcourus else
+      let etatsParcourusMAJ = dfs etat etatsParcourus regles in 
+      match etatsParcourusMAJ with
+      (* Si on a pas trouvé de solution dans ce sous arbre, alors on passe au voisin suivant*)
+      | (newEtatsParcourus, None) -> iterListeEtats etatsRestants newEtatsParcourus
+      (* Sinon, on renvoie l'état trouvé!*)
+      | (newEtatsParcourus, Some etat) -> (etatsParcourus, Some etat) 
+  in let tupleSetEtEtatFinal = iterListeEtats etatsAtteignables (etatsParcourus) in 
+  tupleSetEtEtatFinal
+;;
+
+let bouclePrincipaleRecherche (etatInit : etat) regles (fichier : string) =
+  let (memoire, etatTrouve) = dfs etatInit States.empty regles in 
+  match etatTrouve with
+  | None -> printf "INSOLUBLE"; exit 2
+  | Some etatFinal -> let () = ecrireCoupsDansFichier etatFinal.historique fichier in
+                      printf "SUCCES"; exit 0
+
+
+
 
 
 
@@ -518,9 +565,13 @@ let treat_game conf =
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
   let etat1 = construireEtatInit conf regles paquet in
+  let a = dfs (normaliser etat1) (States.empty) regles in
+  print_int (States.cardinal (fst(a))) ; match snd(a) with
+    | None -> let () = print_string ("None") in print_newline () 
+    | Some a -> let () = printEtat a in print_newline () 
   (*let () = printEtat etat1 in*)
   
-  let etat2 = normaliser etat1 in
+  (*let etat2 = normaliser etat1 in
   (*printEtat etat2;*)
   
   (*printf "%b " (coupLegal {source = Card.of_num 6; destination = "T"} regles etat2);*)
@@ -531,13 +582,13 @@ let treat_game conf =
   printf "Int of string de 38 %d \n" (int_of_string "38");
   printf "%b " (coupLegal {source = Card.of_num 33; destination = "38"} regles etat3);*)
   let etat4 = miseAJourPartie {source = Card.of_num 33; destination = "38"} etat3 in
-  let etat4 = normaliser etat4 in 
+  exit 0
   (*printEtat etat4*)
-  match conf.mode with
-  | Search (s) -> exit 0
+  (* match conf.mode with
+  | Search (s) -> bouclePrincipaleRecherche etat2 regles s
   | Check (s) -> 
     let listeCoups = stringListToCoups (lireFichier s) [] in
-    bouclePrincipaleVerif etat2 regles listeCoups 1
+    bouclePrincipaleVerif etat2 regles listeCoups 1 *) *)
   
 ;;
 
