@@ -449,7 +449,7 @@ let creerListeDeCoupsPossible etat regles =
   in let ret = parcoursCol etat.colonnes regles etat [] in 
   let retReg = List.flatten (List.map (fun x -> coupLegalSrc x regles etat) etat.registre) 
   in let listeCoups = List.rev_append retReg ret
-  in let listeEtatsDonnes = List.map (fun x -> miseAJourPartie x etat) listeCoups
+  in let listeEtatsDonnes = List.map (fun x -> normaliser (miseAJourPartie x etat)) listeCoups
   in List.combine listeCoups listeEtatsDonnes
 ;; 
 
@@ -480,7 +480,7 @@ let compEtat etat1 etat2 =
   
 module States = Set.Make (struct type t = etat let compare = compEtat end)
 
-let rec bouclePrincipale etatCourant regles coupsList iter =
+let rec bouclePrincipaleVerif etatCourant regles coupsList iter =
   (* printEtat etatCourant; *)
   match coupsList with 
   | [] -> if etatCourant.score = 52
@@ -492,7 +492,7 @@ let rec bouclePrincipale etatCourant regles coupsList iter =
           (*printEtat newEtat;*)
            let newEtatNormalise = normaliser newEtat in 
            (*printEtat newEtatNormalise;*)
-           bouclePrincipale newEtatNormalise regles coupsRestants (iter + 1)
+           bouclePrincipaleVerif newEtatNormalise regles coupsRestants (iter + 1)
       else let () = print_string "ECHEC " in let () = print_int iter in let () = print_newline () in exit 1
 ;;
 
@@ -537,7 +537,7 @@ let treat_game conf =
   | Search (s) -> exit 0
   | Check (s) -> 
     let listeCoups = stringListToCoups (lireFichier s) [] in
-    bouclePrincipale etat2 regles listeCoups 1
+    bouclePrincipaleVerif etat2 regles listeCoups 1
   
 ;;
 
