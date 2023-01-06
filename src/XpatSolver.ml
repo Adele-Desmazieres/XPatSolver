@@ -510,7 +510,7 @@ let rec dfs etatCourant (etatsParcourus : States.t ) regles =
   (* On ajoute l'état courant aux états parcourus *)
   let etatsParcourus = (States.add etatCourant etatsParcourus) in 
   (* On récupère les voisins *)
-  let etatsAtteignables = creerListeDeCoupsPossible etatCourant regles in
+  let etatsAtteignables = List.rev (List.fast_sort (fun x y -> Stdlib.compare (x.score) (y.score)) (creerListeDeCoupsPossible etatCourant regles)) in
 (*let () = List.iter (fun x -> printEtat x) etatsAtteignables in*)
   (* On itère sur les voisins *)
   let rec iterListeEtats (etatsAParcourir : Etat.etat list) (etatsParcourus : States.t)=
