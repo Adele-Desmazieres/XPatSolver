@@ -533,6 +533,47 @@ let rec dfs etatCourant (etatsParcourus : States.t ) regles =
   tupleSetEtEtatFinal
 ;;
 
+let dfsStart (etatCourant : etat) (regles : regles) : (States.t * etat option) =
+  dfs etatCourant States.empty regles
+;;
+
+(* prend en arguement l'état initial, 
+   cherche de manière exhaustive un état ou le score = 52 par BFS,
+   renvoie cet état final ou None s'il n'existe pas *)
+let bfsStart (etatCourant : etat) (regles : regles) : (States.t * etat option) =
+    
+  let rec bfsRec (etatsParcourus : States.t) (file : etat Fifo.t) : (etat option * States.t * etat Fifo.t) =
+    (* si la file est vide, c'est qu'il n'y a pas d'état final gagnant *)
+    if file = Fifo.empty then (None, etatsParcourus, file) else
+      
+    (* retirer l'état de la file *)
+    let etatCourant, file = Fifo.pop file in
+    if etatCourant.score = 52 then (Some etatCourant, etatsParcourus, file) else
+    
+    (* itérer sur la liste d'états atteignables depuis cet état,
+       les ajouter à la file et à l'ensemble d'état parcourus *)
+    let rec parcourirEtats file etatsParcourus etatsAtteignables =
+      match etatsAtteignables with
+      | [] -> file, etatsParcourus
+      | x::tail -> if (not (States.mem x etatsParcourus)) 
+        then parcourirEtats (Fifo.push x file) (States.add x etatsParcourus) tail
+        else parcourirEtats file etatsParcourus tail
+    in
+    
+    let file, etatsParcourus = parcourirEtats file etatsParcourus (creerListeDeCoupsPossible etatCourant regles) in
+    
+    print_string "\nnbr elements parcourus : ";
+    print_int (States.cardinal etatsParcourus);
+    print_newline ();
+      
+    bfsRec etatsParcourus file in
+  
+  let f = Fifo.empty in
+  let etatFinal, etatsParcourus, file = (bfsRec (States.singleton etatCourant) (Fifo.push etatCourant f)) in
+  (etatsParcourus, etatFinal)
+;;
+  
+
 let bouclePrincipaleRecherche (etatInit : etat) regles (fichier : string) =
   let (memoire, etatTrouve) = dfs etatInit States.empty regles in 
   match etatTrouve with
@@ -565,8 +606,11 @@ let treat_game conf =
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
   let etat1 = construireEtatInit conf regles paquet in
-  let a = dfs (normaliser etat1) (States.empty) regles in
-  print_int (States.cardinal (fst(a))) ; match snd(a) with
+  let a = bfsStart (normaliser etat1) regles in
+  print_string "\nNombre états parcourus : ";
+  print_int (States.cardinal (fst(a))) ;
+  print_newline (); 
+  match snd(a) with
     | None -> let () = print_string ("None") in print_newline () 
     | Some a -> let () = printEtat a in print_newline () 
   (*let () = printEtat etat1 in*)
