@@ -502,6 +502,42 @@ let rec bouclePrincipaleVerif etatCourant regles coupsList iter =
       else let () = print_string "ECHEC " in let () = print_int iter in let () = print_newline () in exit 1
 ;;
 
+(* prend en arguement l'état initial, 
+   cherche de manière exhaustive un état ou le score = 52 par BFS,
+   renvoie cet état final ou None s'il n'existe pas *)
+   let bfsStart (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) : (States.t * etat option) =
+    
+    let rec bfsRec (etatsParcourus : States.t) (file : etat Fifo.t) : (etat option * States.t * etat Fifo.t) =
+      (* si la file est vide, c'est qu'il n'y a pas d'état final gagnant *)
+      if file = Fifo.empty then (None, etatsParcourus, file) else
+        
+      (* retirer l'état de la file *)
+      let etatCourant, file = Fifo.pop file in
+      if etatCourant.score = 52 then (Some etatCourant, etatsParcourus, file) else
+      
+      (* itérer sur la liste d'états atteignables depuis cet état,
+         les ajouter à la file et à l'ensemble d'état parcourus *)
+      let rec parcourirEtats file etatsParcourus etatsAtteignables =
+        match etatsAtteignables with
+        | [] -> file, etatsParcourus
+        | x::tail -> if (not (States.mem x etatsParcourus)) 
+          then parcourirEtats (Fifo.push x file) (States.add x etatsParcourus) tail
+          else parcourirEtats file etatsParcourus tail
+      in
+      
+      let file, etatsParcourus = parcourirEtats file etatsParcourus (creerListeDeCoupsPossible etatCourant regles) in
+      
+      print_string "\nnbr elements parcourus : ";
+      print_int (States.cardinal etatsParcourus);
+      print_newline ();
+        
+      bfsRec etatsParcourus file in
+    
+    let f = Fifo.empty in
+    let etatFinal, etatsParcourus, file = (bfsRec (etatsParcourus) (Fifo.push etatCourant f)) in
+    (etatsParcourus, etatFinal)
+  ;;
+
 (* Parcours en profondeur sur le graphe des états du jeu *)
 let rec dfs etatCourant (etatsParcourus : States.t ) regles =
  (*printEtat etatCourant;*)
@@ -523,12 +559,20 @@ let rec dfs etatCourant (etatsParcourus : States.t ) regles =
      let () = print_bool (States.mem etat etatsParcourus) in *)
       (* Si on trouve un voisin, alors on appelle DFS dessus et on récupère son Set de mémoire *)
       if States.mem etat etatsParcourus then (* let () = print_string ("Dommje"); print_newline () in *) iterListeEtats etatsRestants etatsParcourus else
+        if etat.score < 39 then
       let etatsParcourusMAJ = dfs etat etatsParcourus regles in 
       match etatsParcourusMAJ with
-      (* Si on a pas trouvé de solution dans ce sous arbre, alors on passe au voisin suivant*)
-      | (newEtatsParcourus, None) -> iterListeEtats etatsRestants newEtatsParcourus
-      (* Sinon, on renvoie l'état trouvé!*)
-      | (newEtatsParcourus, Some etat) -> (etatsParcourus, Some etat) 
+          (* Si on a pas trouvé de solution dans ce sous arbre, alors on passe au voisin suivant*)
+          | (newEtatsParcourus, None) -> iterListeEtats etatsRestants newEtatsParcourus
+          (* Sinon, on renvoie l'état trouvé!*)
+          | (newEtatsParcourus, Some etat) -> (etatsParcourus, Some etat) 
+        else 
+          let etatsParcourusMAJ = bfsStart etat etatsParcourus regles in 
+          match etatsParcourusMAJ with
+          (* Si on a pas trouvé de solution dans ce sous arbre, alors on passe au voisin suivant*)
+          | (newEtatsParcourus, None) -> iterListeEtats etatsRestants newEtatsParcourus
+          (* Sinon, on renvoie l'état trouvé!*)
+          | (newEtatsParcourus, Some etat) -> (etatsParcourus, Some etat) 
   in let tupleSetEtEtatFinal = iterListeEtats etatsAtteignables (etatsParcourus) in 
   tupleSetEtEtatFinal
 ;;
@@ -537,41 +581,7 @@ let dfsStart (etatCourant : etat) (regles : regles) : (States.t * etat option) =
   dfs etatCourant States.empty regles
 ;;
 
-(* prend en arguement l'état initial, 
-   cherche de manière exhaustive un état ou le score = 52 par BFS,
-   renvoie cet état final ou None s'il n'existe pas *)
-let bfsStart (etatCourant : etat) (regles : regles) : (States.t * etat option) =
-    
-  let rec bfsRec (etatsParcourus : States.t) (file : etat Fifo.t) : (etat option * States.t * etat Fifo.t) =
-    (* si la file est vide, c'est qu'il n'y a pas d'état final gagnant *)
-    if file = Fifo.empty then (None, etatsParcourus, file) else
-      
-    (* retirer l'état de la file *)
-    let etatCourant, file = Fifo.pop file in
-    if etatCourant.score = 52 then (Some etatCourant, etatsParcourus, file) else
-    
-    (* itérer sur la liste d'états atteignables depuis cet état,
-       les ajouter à la file et à l'ensemble d'état parcourus *)
-    let rec parcourirEtats file etatsParcourus etatsAtteignables =
-      match etatsAtteignables with
-      | [] -> file, etatsParcourus
-      | x::tail -> if (not (States.mem x etatsParcourus)) 
-        then parcourirEtats (Fifo.push x file) (States.add x etatsParcourus) tail
-        else parcourirEtats file etatsParcourus tail
-    in
-    
-    let file, etatsParcourus = parcourirEtats file etatsParcourus (creerListeDeCoupsPossible etatCourant regles) in
-    
-    print_string "\nnbr elements parcourus : ";
-    print_int (States.cardinal etatsParcourus);
-    print_newline ();
-      
-    bfsRec etatsParcourus file in
-  
-  let f = Fifo.empty in
-  let etatFinal, etatsParcourus, file = (bfsRec (States.singleton etatCourant) (Fifo.push etatCourant f)) in
-  (etatsParcourus, etatFinal)
-;;
+
   
 
 let bouclePrincipaleRecherche (etatInit : etat) regles (fichier : string) =
@@ -606,7 +616,7 @@ let treat_game conf =
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
   let etat1 = construireEtatInit conf regles paquet in
-  let a = bfsStart (normaliser etat1) regles in
+  let a = dfs (normaliser etat1) (States.empty) regles in
   print_string "\nNombre états parcourus : ";
   print_int (States.cardinal (fst(a))) ;
   print_newline (); 
