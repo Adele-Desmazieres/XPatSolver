@@ -595,42 +595,61 @@ let rec dfs etatCourant (etatsParcourus : States.t) regles =
   tupleSetEtEtatFinal
 ;;
 
-let dfs2 (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) : (States.t * etat option) =
+
+let dfs2 (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) (aFiltrer : bool) : (States.t * etat option) =
   
-  let rec dfsRec (etatsParcourus : States.t) (pile : etat Pile.pile) : (etat option * States.t * etat Pile.pile) =
-    let () = if States.cardinal etatsParcourus mod 1000 = 0 then
-      (print_string "\nDFS2 nbr états parcourus : ";
-      print_int (States.cardinal etatsParcourus);
-      print_newline ())
-    else () in 
-    
+  let rec dfsRec (etatsParcourus : States.t) (pile : etat list) (addCondition : etat -> bool) (aFiltrer : bool) : (etat option * States.t * etat list) =
     (* si la pile est vide, c'est qu'il n'y a pas d'état final gagnant *)
-    if pile.Pile.taille = 0 then (None, etatsParcourus, pile) else
+    if List.length pile = 0 then (None, etatsParcourus, pile) else
       
     (* retirer l'état de la pile *)
-    let etatCourant, pile = Pile.popPile pile in
+    let etatCourant, pile = match pile with 
+      | [] -> failwith "Pile vide"
+      | e::tail -> e, tail
+    in
+    
+    (*
+    let () = if States.cardinal etatsParcourus mod 2000 = 0 then
+      (print_string "\nDFS2 nbr états parcourus : ";
+      print_int (States.cardinal etatsParcourus);
+      print_string "\n score actuel : ";
+      print_int etatCourant.score;
+      print_newline ();)
+    else () in 
+    *)
+    
+    (* condition de vistoire *)
     if etatCourant.score = 52 then (Some etatCourant, etatsParcourus, pile) else
+    
+    (* condition de recherche non exhaustive *)
+    let pile, addCondition, aFiltrer = if aFiltrer && etatCourant.score mod 10 = 0 && (States.cardinal etatsParcourus) > 5000
+      then (*let () = print_string "\nFiltrage de la pile...\n" in*)
+      (List.filter_map 
+      (fun etatX -> if etatX.score >= etatCourant.score-5 then Some etatX else None) pile), 
+      (fun x -> x.score >= etatCourant.score-5), true
+    else pile, addCondition, aFiltrer
+    in
     
     (* itérer sur la liste d'états atteignables depuis cet état,
        les ajouter à la pile et à l'ensemble d'état parcourus *)
-    let rec parcourirEtats pile etatsParcourus etatsAtteignables =
+    let rec parcourirEtats pile etatsParcourus etatsAtteignables addCondition =
       match etatsAtteignables with
       | [] -> pile, etatsParcourus
-      | x::tail -> if (not (States.mem x etatsParcourus)) 
-        then parcourirEtats (Pile.pushPile pile x) (States.add x etatsParcourus) tail
-        else parcourirEtats pile etatsParcourus tail
+      | x::tail -> if (not (States.mem x etatsParcourus)) && (addCondition x)
+        then parcourirEtats (x::pile) (States.add x etatsParcourus) tail addCondition
+        else parcourirEtats pile etatsParcourus tail addCondition
     in
     
-    let etatsAtteignables = List.fast_sort 
-      (fun x y -> -1 * Stdlib.compare (x.score) (y.score)) 
+    let etatsAtteignables = 
+      List.fast_sort (fun x y -> -1 * Stdlib.compare (x.score) (y.score))
       (creerListeDeCoupsPossible etatCourant regles) in
-    let pile, etatsParcourus = parcourirEtats pile etatsParcourus etatsAtteignables in
-    dfsRec etatsParcourus pile 
+    let pile, etatsParcourus = parcourirEtats pile etatsParcourus etatsAtteignables addCondition in
+    (*let pile = List.fast_sort (fun x y -> -1 * Stdlib.compare (x.score) (y.score)) pile in*)
+    dfsRec etatsParcourus pile addCondition aFiltrer
   in
   
-  let p = Pile.newPile in
-  let etatFinal, etatsParcourus, pile = 
-    dfsRec (States.add etatCourant etatsParcourus) (Pile.pushPile p etatCourant) in
+  let p = [etatCourant] in
+  let etatFinal, etatsParcourus, pile = dfsRec (States.add etatCourant etatsParcourus) p (fun x -> true) aFiltrer in
   (etatsParcourus, etatFinal)
 ;;
 
@@ -668,7 +687,7 @@ let treat_game conf =
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
   let etat1 = construireEtatInit conf regles paquet in
-  let a = dfs2 (normaliser etat1) (States.empty) regles in
+  let a = dfs2 (normaliser etat1) (States.empty) regles true in
   print_string "\nNombre états parcourus : ";
   print_int (States.cardinal (fst(a))) ;
   print_newline (); 
