@@ -7,7 +7,8 @@ type 'a pile = {
 }
 
 val newPile : 'a pile
-val popPile : 'a pile -> ('a * 'a pile) option
+val popPile : 'a pile -> 'a * 'a pile
 val pushPile : 'a pile -> 'a -> 'a pile
 val peekPile : 'a pile -> 'a option
 val equalsPile : 'a pile -> 'a pile -> bool
+val ofList : 'a list -> 'a pile
