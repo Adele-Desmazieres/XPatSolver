@@ -432,9 +432,9 @@ let ecrireCoupsDansFichier coups fichier =
   let rec ecriture file coups = 
     match coups with 
     |[] -> ()
-    | coup :: rest -> let () = Printf.fprintf file "%s %s\n" (Card.to_string(coup.source)) coup.destination
+    | coup :: rest -> let () = Printf.fprintf file "%s %s\n" (string_of_int (Card.to_num(coup.source))) coup.destination
       in ecriture file rest 
-  in ecriture file coups 
+  in ecriture file (List.rev coups) 
 ;;
 
 let stringToCoup args = 
@@ -609,7 +609,7 @@ let dfs2 (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) (aFi
     in
     
     (*
-    let () = if States.cardinal etatsParcourus mod 2000 = 0 then
+    let () = if States.cardinal etatsParcourus mod 1000 = 0 then
       (print_string "\nDFS2 nbr états parcourus : ";
       print_int (States.cardinal etatsParcourus);
       print_string "\n score actuel : ";
@@ -656,11 +656,11 @@ let dfs2 (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) (aFi
 
 
 let bouclePrincipaleRecherche (etatInit : etat) regles (fichier : string) =
-  let (memoire, etatTrouve) = dfs etatInit States.empty regles in 
+  let (memoire, etatTrouve) = dfs2 etatInit States.empty regles true in 
   match etatTrouve with
-  | None -> printf "INSOLUBLE"; exit 2
+  | None -> printf "INSOLUBLE\n"; exit 2
   | Some etatFinal -> let () = ecrireCoupsDansFichier etatFinal.historique fichier in
-                      printf "SUCCES"; exit 0
+                      printf "SUCCES\n"; exit 0
 
 
 
@@ -684,16 +684,20 @@ let treat_game conf =
   print_newline ();*)
   
   
+  (* TESTS DE RECHERCHE *)
+  
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
-  let etat1 = construireEtatInit conf regles paquet in
+  let etat1 = normaliser (construireEtatInit conf regles paquet) in
+  (*
   let a = dfs2 (normaliser etat1) (States.empty) regles true in
   print_string "\nNombre états parcourus : ";
   print_int (States.cardinal (fst(a))) ;
   print_newline (); 
   match snd(a) with
     | None -> let () = print_string ("None") in print_newline () 
-    | Some a -> let () = printEtat a in print_newline () 
+    | Some a -> let () = printEtat a in print_newline () *)
+    
   (*let () = printEtat etat1 in*)
   
   (*let etat2 = normaliser etat1 in
@@ -702,18 +706,18 @@ let treat_game conf =
   (*printf "%b " (coupLegal {source = Card.of_num 6; destination = "T"} regles etat2);*)
   let etat3 = miseAJourPartie {source = Card.of_num 6; destination = "T"} etat2 in 
   let etat3 = normaliser etat3 in
-  (*printEtat etat3;
+  printEtat etat3;
   
   printf "Int of string de 38 %d \n" (int_of_string "38");
-  printf "%b " (coupLegal {source = Card.of_num 33; destination = "38"} regles etat3);*)
+  printf "%b " (coupLegal {source = Card.of_num 33; destination = "38"} regles etat3);
   let etat4 = miseAJourPartie {source = Card.of_num 33; destination = "38"} etat3 in
-  exit 0
+  exit 0 *)
   (*printEtat etat4*)
-  (* match conf.mode with
-  | Search (s) -> bouclePrincipaleRecherche etat2 regles s
+  match conf.mode with
+  | Search (s) -> bouclePrincipaleRecherche etat1 regles s
   | Check (s) -> 
     let listeCoups = stringListToCoups (lireFichier s) [] in
-    bouclePrincipaleVerif etat2 regles listeCoups 1 *) *)
+    bouclePrincipaleVerif etat1 regles listeCoups 1 
   
 ;;
 
