@@ -201,13 +201,6 @@ let estSeuleSurColonne (carte : Card.card) etat =
   in parcoursCol etat.colonnes carte
 ;;
 
-(* Renvoie vrai si le coup n'est pas stupide *)
-let coupPasStupide (coup : coup) (regles : regles) (etat : etat) =
-  match coup.destination with 
-  | "T" -> (not (estDansLeRegistre coup.source etat))
-  | "V" -> (not (estSeuleSurColonne coup.source etat))
-  | x -> true
-
 (* Renvoie une liste de coups légaux pour une carte source, un état et des règles donnés *)
 let coupLegalSrc (source : Card.card) (regles : regles) (etat : etat) =
   let rec legal_rec source dests regles etat ret =
