@@ -134,16 +134,20 @@ let respecteEnchainement
 
 
 (* Renvoie vrai si la carte représentée par dest est au sommet d'une des colonnes de l'état etat *)
-let estAccessibleSurColonne (etat : etat) (dest : int) =
-  let rec colSearcher colonnes dest =
+let getCartesSommets (etat : etat) =
+  let rec colSearcher colonnes ret =
     match colonnes with
-    | [] -> false
+    | [] -> ret
     | col :: restantes ->
       let carteSurPile = Pile.peekPile col
       in match carteSurPile with
-      | None -> colSearcher restantes dest
-      | Some x -> if (Card.to_num x) = dest then true else colSearcher restantes dest
-  in colSearcher etat.colonnes dest 
+      | None -> colSearcher restantes ret
+      | Some x -> colSearcher restantes (x :: ret)
+  in colSearcher etat.colonnes []
+;;
+
+let estAccessibleSurColonne etat dest =
+  List.mem (Card.of_num(dest)) (getCartesSommets etat)
 ;;
 
 (* Renvoie vrai si la carte src est dans le registre de l'état courant *)
@@ -210,7 +214,7 @@ let coupLegalSrc (source : Card.card) (regles : regles) (etat : etat) =
       let coup = { source = source; destination = dest } in
       if coupLegal coup regles etat then legal_rec source rest regles etat (coup :: ret)
       else legal_rec source rest regles etat ret
-  in let paquet = ("T" :: "V" :: (List.map (fun x -> string_of_int x) (List.init 52 (fun x -> x))))
+  in let paquet = ("T" :: "V" :: (List.map (fun x -> string_of_int x) (List.map (fun x -> Card.to_num x) (getCartesSommets etat))))
   in legal_rec source (List.rev paquet) regles etat []
 ;;
 
