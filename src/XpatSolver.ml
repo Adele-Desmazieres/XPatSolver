@@ -17,6 +17,13 @@ let getgame = function
   | "MidnightOil"|"mo" -> Midnight
   | "BakersDozen"|"bd" -> Baker
   | _ -> raise Not_found
+  
+let print_conf (c : config) : (unit) =
+  match config.game with
+  | Freecell -> Printf.printf "FreeCell.%d\n" c.seed
+  | Seahaven -> Printf.printf "Seahaven.%d\n" c.seed
+  | Midnight -> Printf.printf "MidnightOil.%d\n" c.seed 
+  | Baker -> Printf.printf "BakersDozen.%d\n" c.seed
 
 let split_on_dot name =
   match String.split_on_char '.' name with
@@ -247,7 +254,6 @@ let normaliserColonnes (etat : etat) =
   let newScore = List.length (snd(newColsAndCardsMoved)) in
   
   let newCols = fst (newColsAndCardsMoved) in 
-  (* TODO supprimer les colonnes vides de la liste *)
   { depot = newDepot; colonnes = newCols; registre = etat.registre; historique = etat.historique; 
   nbColMax = etat.nbColMax;
   nbRegMax = etat.nbRegMax;
@@ -512,6 +518,7 @@ let rec bouclePrincipaleVerif etatCourant regles coupsList iter =
    cherche de manière exhaustive un état ou le score = 52 par BFS,
    renvoie cet état final ou None s'il n'existe pas 
 *)
+(*
 let bfsStart (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) : (States.t * etat option) =
   
   let rec bfsRec (etatsParcourus : States.t) (file : etat Fifo.t) : (etat option * States.t * etat Fifo.t) =
@@ -547,9 +554,10 @@ let bfsStart (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) 
   let f = Fifo.empty in
     let etatFinal, etatsParcourus, file = (bfsRec (States.add etatCourant etatsParcourus) (Fifo.push etatCourant f)) in
     (etatsParcourus, etatFinal)
-;;
+;;*)
 
 (* Parcours en profondeur sur le graphe des états du jeu *)
+(*
 let rec dfs etatCourant (etatsParcourus : States.t) regles =
   let () = if States.cardinal etatsParcourus mod 1000 = 0 then
     (print_string "\nDFS nbr états parcourus : ";
@@ -593,12 +601,23 @@ let rec dfs etatCourant (etatsParcourus : States.t) regles =
         | (newEtatsParcourus, Some etat) -> (newEtatsParcourus, Some etat) 
   in let tupleSetEtEtatFinal = iterListeEtats etatsAtteignables (etatsParcourus) in 
   tupleSetEtEtatFinal
-;;
+;;*)
 
 
-let dfs2 (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) (aFiltrer : bool) : (States.t * etat option) =
+let dfs2 
+  (etatCourant : etat) 
+  (etatsParcourus : States.t) 
+  (regles : regles) 
+  (aFiltrer : bool) 
+  : (States.t * etat option) =
   
-  let rec dfsRec (etatsParcourus : States.t) (pile : etat list) (addCondition : etat -> bool) (aFiltrer : bool) : (etat option * States.t * etat list) =
+  let rec dfsRec 
+    (etatsParcourus : States.t) 
+    (pile : etat list) 
+    (addCondition : etat -> bool) 
+    (aFiltrer : bool) 
+    (meilleurScore : int)
+    : (etat option * States.t * etat list) =
     (* si la pile est vide, c'est qu'il n'y a pas d'état final gagnant *)
     if List.length pile = 0 then (None, etatsParcourus, pile) else
       
@@ -609,11 +628,11 @@ let dfs2 (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) (aFi
     in
     
     (*
-    let () = if States.cardinal etatsParcourus mod 1000 = 0 then
-      (print_string "\nDFS2 nbr états parcourus : ";
-      print_int (States.cardinal etatsParcourus);
-      print_string "\n score actuel : ";
-      print_int etatCourant.score;
+    let () = if States.cardinal etatsParcourus mod 2000 = 0 then
+      (Printf.printf "\nDFS2 nbr états en mémoire : %d" (States.cardinal etatsParcourus);
+      Printf.printf "\nDFS2 nbr états dans la pile : %d" (List.length pile);
+      Printf.printf "\nScore actuel : %d" etatCourant.score;
+      Printf.printf "\nScore du dernier filtrage : %d" meilleurScore;
       print_newline ();)
     else () in 
     *)
@@ -621,13 +640,19 @@ let dfs2 (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) (aFi
     (* condition de vistoire *)
     if etatCourant.score = 52 then (Some etatCourant, etatsParcourus, pile) else
     
+    let distanceDoubli = 8 in 
+      
     (* condition de recherche non exhaustive *)
-    let pile, addCondition, aFiltrer = if aFiltrer && etatCourant.score mod 10 = 0 && (States.cardinal etatsParcourus) > 5000
-      then (*let () = print_string "\nFiltrage de la pile...\n" in*)
-      (List.filter_map 
-      (fun etatX -> if etatX.score >= etatCourant.score-5 then Some etatX else None) pile), 
-      (fun x -> x.score >= etatCourant.score-5), true
-    else pile, addCondition, aFiltrer
+    let pile, etatsParcourus, addCondition, meilleurScore = 
+    if etatCourant.score > distanceDoubli && etatCourant.score > meilleurScore+1 && aFiltrer && (States.cardinal etatsParcourus) >= 20000
+      then 
+      (*let () = (Printf.printf "\nScore : %d\nScore max : %d\nFiltrage de la pile et la mémoire...\n" etatCourant.score meilleurScore) in
+      let () = print_newline () in*)
+      (List.filter (fun etatX -> etatX.score >= etatCourant.score-distanceDoubli) pile), 
+      (States.filter (fun etatX -> etatX.score >= etatCourant.score-distanceDoubli) etatsParcourus),
+      (fun x -> x.score >= etatCourant.score-distanceDoubli),
+      etatCourant.score
+    else pile, etatsParcourus, addCondition, meilleurScore
     in
     
     (* itérer sur la liste d'états atteignables depuis cet état,
@@ -640,16 +665,16 @@ let dfs2 (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) (aFi
         else parcourirEtats pile etatsParcourus tail addCondition
     in
     
-    let etatsAtteignables = 
-      List.fast_sort (fun x y -> -1 * Stdlib.compare (x.score) (y.score))
-      (creerListeDeCoupsPossible etatCourant regles) in
-    let pile, etatsParcourus = parcourirEtats pile etatsParcourus etatsAtteignables addCondition in
-    (*let pile = List.fast_sort (fun x y -> -1 * Stdlib.compare (x.score) (y.score)) pile in*)
-    dfsRec etatsParcourus pile addCondition aFiltrer
+    let pile, etatsParcourus = 
+      parcourirEtats pile etatsParcourus (creerListeDeCoupsPossible etatCourant regles) addCondition in
+      
+    let pile = List.fast_sort (fun x y -> -1 * Stdlib.compare (x.score) (y.score)) pile in
+    dfsRec etatsParcourus pile addCondition aFiltrer meilleurScore
   in
   
   let p = [etatCourant] in
-  let etatFinal, etatsParcourus, pile = dfsRec (States.add etatCourant etatsParcourus) p (fun x -> true) aFiltrer in
+  let etatFinal, etatsParcourus, pile = 
+    dfsRec (States.add etatCourant etatsParcourus) p (fun x -> true) aFiltrer 0 in
   (etatsParcourus, etatFinal)
 ;;
 
@@ -658,61 +683,22 @@ let dfs2 (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) (aFi
 let bouclePrincipaleRecherche (etatInit : etat) regles (fichier : string) =
   let (memoire, etatTrouve) = dfs2 etatInit States.empty regles true in 
   match etatTrouve with
-  | None -> printf "INSOLUBLE\n"; exit 2
+  | None -> printf "INSOLUBLE"; exit 2
   | Some etatFinal -> let () = ecrireCoupsDansFichier etatFinal.historique fichier in
-                      printf "SUCCES\n"; exit 0
+                      printf "SUCCES"; exit 0
 
 
 
-
-
-
-(* TODO : La fonction suivante est à adapter et continuer *)
 
 let treat_game conf =
   let permut = XpatRandom.shuffle conf.seed in
-  
-  (*Printf.printf "\nVoici juste la permutation de graine %d:\n" conf.seed;*)
-  
-  (*printf "%s " (Card.to_string c)*)
-  (*List.iter (fun n -> printf "%s " (Card.to_string (Card.of_num n))) permut;*)
-  
-  (*print_newline ();
   print_newline ();
-  (*List.iter (fun n -> Printf.printf "%s " (Card.to_string (Card.of_num n)))
-    permut; *)
-  print_newline ();*)
-  
-  
-  (* TESTS DE RECHERCHE *)
-  
+  print_conf conf;
+    
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
   let etat1 = normaliser (construireEtatInit conf regles paquet) in
-  (*
-  let a = dfs2 (normaliser etat1) (States.empty) regles true in
-  print_string "\nNombre états parcourus : ";
-  print_int (States.cardinal (fst(a))) ;
-  print_newline (); 
-  match snd(a) with
-    | None -> let () = print_string ("None") in print_newline () 
-    | Some a -> let () = printEtat a in print_newline () *)
-    
-  (*let () = printEtat etat1 in*)
   
-  (*let etat2 = normaliser etat1 in
-  (*printEtat etat2;*)
-  
-  (*printf "%b " (coupLegal {source = Card.of_num 6; destination = "T"} regles etat2);*)
-  let etat3 = miseAJourPartie {source = Card.of_num 6; destination = "T"} etat2 in 
-  let etat3 = normaliser etat3 in
-  printEtat etat3;
-  
-  printf "Int of string de 38 %d \n" (int_of_string "38");
-  printf "%b " (coupLegal {source = Card.of_num 33; destination = "38"} regles etat3);
-  let etat4 = miseAJourPartie {source = Card.of_num 33; destination = "38"} etat3 in
-  exit 0 *)
-  (*printEtat etat4*)
   match conf.mode with
   | Search (s) -> bouclePrincipaleRecherche etat1 regles s
   | Check (s) -> 
