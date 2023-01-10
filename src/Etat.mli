@@ -12,7 +12,6 @@ type etat = {
 	colonnes : (Card.card Pile.pile) list; (* Colonnes à implémenter FArray de Piles *)
 	depot : Card.card list; (* Contient une liste des dernieres cartes ajoutées *)
 	registre : Card.card list; (* Liste ordonnée des cartes au registre *)
-	nbColMax : int;
 	nbRegMax : int;
 	score : int
   
