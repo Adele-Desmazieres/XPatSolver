@@ -119,7 +119,9 @@ Enfin mais pas des moidres, la fonction de recherche a été le meilleur candida
 
 Nous gardons donc à jour une "pile" d'états, modélisée par une liste et non pas par un objet pile, car elle doit être souvent retriée. Il y a également une "mémoire" de tous les états parcourus et dans la pile, sous forme de State.t état. Cet ensemble permet d'éviter de traiter plusieurs fois le même état, et donc gagner du temps. Avec ces éléments, nous passons la majorité des tests faciles et quelques tests medians. 
 
-La dernière optimisation est l'implémentation d'un filtrage de la mémoire et la pile durant la recherche. Ce filtre ce déclenche quand on atteint un nouvel état 
+La dernière optimisation est l'implémentation d'un filtrage de la mémoire et la pile durant la recherche. Ce filtre ce déclenche quand on atteint un nouvel état de score supérieur au dernier filtrage. Alors les états de score inférieurs à la distance d'oubli (valeur arbitraire à 8) sont filtrés, et aucun ne pourra être ajouté ensuite. 
+
+
 
 
 
