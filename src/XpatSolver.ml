@@ -112,7 +112,6 @@ let construireEtatInit (conf : config) (regles : regles) (paquet : Card.card lis
   depot = [(0, Coeur); (0, Carreau); (0, Trefle); (0, Pique)];
   registre = paquet2; (* TODO : vérifier si ca passe de faire ca comme ca *)
   historique = [];
-  nbColMax = regles.nbrColonnes;
   nbRegMax = regles.capaciteRegistre;
   score = 0;
   }
@@ -230,7 +229,6 @@ let normaliserColonnes (etat : etat) =
   
   let newCols = fst (newColsAndCardsMoved) in 
   { depot = newDepot; colonnes = newCols; registre = etat.registre; historique = etat.historique; 
-  nbColMax = etat.nbColMax;
   nbRegMax = etat.nbRegMax;
   score = etat.score + newScore;
   } 
@@ -249,7 +247,6 @@ let normaliserRegistre (etat : etat) =
   let newScore = List.length (snd(newRegistreAndCardsMoved)) in
   let newRegistre = fst (newRegistreAndCardsMoved) in 
   { depot = newDepot; colonnes = etat.colonnes; registre = newRegistre; historique = etat.historique;
-  nbColMax = etat.nbColMax;
   nbRegMax = etat.nbRegMax;
   score = etat.score + newScore;
   } 
@@ -280,7 +277,6 @@ let normaliser (etat : etat) =
     score = etatNormalise.score;
     depot = etatNormalise.depot;
     nbRegMax = etatNormalise.nbRegMax;
-    nbColMax = etatNormalise.nbColMax;
     registre = List.sort (fun x y -> Stdlib.compare (Card.to_num x) (Card.to_num y) ) etatNormalise.registre;
   } 
 ;; 
@@ -308,7 +304,7 @@ let mettreAuRegistre (coup : coup) (etat : etat) =
   if (estDansLeRegistre coup.source etat) then etat else
   let newCols = enleverDeCol etat.colonnes [] coup.source in 
   let newreg = coup.source::etat.registre in 
-  {depot = etat.depot; colonnes = newCols; registre = newreg; historique = (coup :: etat.historique); nbColMax = etat.nbColMax; nbRegMax = etat.nbRegMax; score = etat.score}
+  {depot = etat.depot; colonnes = newCols; registre = newreg; historique = (coup :: etat.historique); nbRegMax = etat.nbRegMax; score = etat.score}
 ;;
 
 let rec mettreDansColVideRec oldCols newCols cardToAdd =
@@ -348,7 +344,6 @@ let deplacerDansCol (coup : coup) (etat : etat) (cardnum : int) =
 	colonnes = newCols; 
 	depot = etat.depot; 
 	registre = registreMoinsCarte;
-	nbColMax = etat.nbColMax;
 	nbRegMax = etat.nbRegMax;
   score = etat.score}
 ;;
