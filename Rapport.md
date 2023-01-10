@@ -12,25 +12,25 @@ Université de Paris Cité
 
 ### Fonctionnalités
 
-*TODO : Donnez une description précise des fonctionnalités implémentées par votre rendu - sujet minimal, extensions éventuelles, éventuellement parties non réalisées ou non fonctionnelles.*
-
 Ce projet est composé de 3 parties : 
-1. l'implémentation du solitaire, avec ses 4 variantes, permettre à l'utilisateur de vérifier une solution en soumettant un fichier de déplacements de cartes
+1. L'implémentation du solitaire, avec ses 4 variantes :
    * FreeCell
    * Seahaven
    * Midnight Oil
    * Baker's Dozen
-2. la recherche automatisée de solutions du solitaire
+2. La vérification d'une solution en soumettant un fichier de déplacements de cartes
+3. La recherche automatisée de solutions du solitaire
+
+Un script bash a également été ajouté comme extension afin de tester un grand nombre de configurations pour la recherche de solutions.
 
 
 ### Compilation et exécution
-*TODO : Documentez ensuite de façon précise la manière dont votre projet doit être compilé (normalement via dune) et exécuté (en donnant les options acceptées par votre programme). Pour ce projet, aucune bibliothèques externes n'est autorisé a priori. Nous contacter si cela vous semble problématique.*
 
 Pour compiler et exécuter le programme, allez dans un terminal sous bash.
 
 Lancement des tests :
 ```sh
-dune runtest tests/I
+dune runtest
 ```
 
 Compilation :
@@ -38,50 +38,57 @@ Compilation :
 dune build
 ```
 
-Exécution avec les paramètres par défaut :
-```sh
-./run
-```
-
-Exécution avec un type de solitaire spécifique (ex : freecell) et une graine spécifique (ex : 123) :
-```sh
-./run freecell.123
-```
-
 Recherche d'une solution pour une partie, et enregistrement de la solution dans le fichier spécifié :
 ```sh
-./run -search file_name freecell.123
+./run -search file_name FreeCell.123
 ```
 
 Vérification de la correction d'un fichier solution pour une partie avec une graine spécifique :
 ```sh
-./run -check file_name freecell.123
+./run -check file_name FreeCell.123
 ```
 
 Les types de parties possibles sont :
-- freecell ou fc -> FreeCell
-- seahaven ou st -> Seahaven
-- midnightoil ou mo -> Midnight Oil
-- bakersdozen ou bc -> Baker's Dozen
+- FreeCell ou fc -> FreeCell
+- Seahaven ou st -> Seahaven
+- MidnightOil ou mo -> Midnight Oil
+- BakersDozen ou bc -> Baker's Dozen
 
-Les graines possibles vont de 1 and 999'999'999. 
+Les graines possibles vont de 1 à 999'999'999. 
 
 ### Découpage modulaire
 
-Etat.ml -> définit le type état ainsi que les méthodes associées à l'affichage de ce dernier. Un état représente l'état du tapis de jeu à un moment donné.
+#### Etat.ml
+Définit le type état ainsi que les méthodes associées à l'affichage de ce dernier. Un état représente l'état du tapis de jeu à un moment donné. De plus, il définit le type coup qui correspond au mouvement d'une carte. Voici comment est structuré le type état :
 
-Pile.ml -> Implémente une structure de type LIFO ainsi que la plupart des méthodes associées pour l'utiliser.
+- les colonnes de cartes : une liste de piles de cartes (éventuellement avec des piles vides pour les colonnes vides)
+- le registre : une liste de cartes (de taille variable, donc pas de registre vide)
+- la capacité maximum du registre : un entier
+- le dépôt : une liste de cartes qui contient seulement la dernière carte déposée de chaque couleur
+- l'historique : une liste de coups qui mènent à l'état actuel
+- le score : un entier qui représente le nombre de cartes mises au dépôt
+
+Le type coup est défini ainsi :
+
+- la source : la carte déplacée
+- la destination : un String qui représente soit le numéro de la carte sur laquelle la carte source est déplacée ou alors un "T" pour un mouvement vers le registre, ou un "V" pour un mouvement vers une colonne vide
+
+#### Pile.ml
+Implémente une structure de type LIFO ainsi que la plupart des méthodes associées pour l'utiliser. Cette structure est utilisée pour représenter les colonnes de cartes.
+
+#### Autres structures
+
+Le type regles :
+- la capacité du registre
+- le nombre de colonnes
+- la distribution des cartes : une liste du nombre de cartes dans chaque colonne
+  carteSurColonneVide : (Card.rank option) option; (* Quel est le rang de carte autorisé sur une colonne vide : None -> Aucun, Some (n) -> rang n, Some (None) -> Tous *)
+  enchainement : enchainementCouleur;
 
 
-###### Choix des structures à utiliser pour modéliser le solitaire
-Après avoir mis en place le git du projet, nous nous sommes accordé sur la manière d'implémenter les mécanismes du solitaire :
 
-- les colonnes de cartes : une liste de piles de cartes
-- les colonnes vides : une pile de cartes vide
-- les registres : une liste de cartes
-- les dépôts : idem, mais celle ci contient seulement la dernière carte déposée de chaque couleur
 
-Nous gardons à l'esprit la possibilité d'en changer si d'autres options se révélaient plus efficace. 
+
 
 ### Organisation du travail
 
