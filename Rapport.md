@@ -15,7 +15,7 @@ Université de Paris Cité
 *TODO : Donnez une description précise des fonctionnalités implémentées par votre rendu - sujet minimal, extensions éventuelles, éventuellement parties non réalisées ou non fonctionnelles.*
 
 Ce projet est composé de 3 parties : 
-1. l'implémentation du solitaire, avec ses 4 variantes, permettre à l'utilisateur d'y "jouer" en soumettant un fichier de déplacements de cartes
+1. l'implémentation du solitaire, avec ses 4 variantes, permettre à l'utilisateur de vérifier une solution en soumettant un fichier de déplacements de cartes
    * FreeCell
    * Seahaven
    * Midnight Oil
@@ -67,34 +67,31 @@ Les types de parties possibles sont :
 Les graines possibles vont de 1 and 999'999'999. 
 
 ### Découpage modulaire
-*TODO : Donnez une description des traitements pris en charge par chaque module (.ml) de votre projet Précisez le rôle et la nécessité de chaque module ajouté au dépôt initial.*
 
-### Organisation du travail
-*TODO : Cette partie est plus libre dans sa forme. Indiquez la manière dont les tâches ont été réparties entre les membres du groupe au cours du temps. Donnez une brève chronologie de votre travail sur ce projet au cours de ce semestre.*
+Etat.ml -> définit le type état ainsi que les méthodes associées à l'affichage de ce dernier. Un état représente l'état du tapis de jeu à un moment donné.
 
-#### Semaine 47
+Pile.ml -> Implémente une structure de type LIFO ainsi que la plupart des méthodes associées pour l'utiliser.
+
 
 ###### Choix des structures à utiliser pour modéliser le solitaire
 Après avoir mis en place le git du projet, nous nous sommes accordé sur la manière d'implémenter les mécanismes du solitaire :
 
 - les colonnes de cartes : une liste de piles de cartes
-- les colonnes vides : un entier représentant leur nombre
+- les colonnes vides : une pile de cartes vide
 - les registres : une liste de cartes
 - les dépôts : idem, mais celle ci contient seulement la dernière carte déposée de chaque couleur
 
 Nous gardons à l'esprit la possibilité d'en changer si d'autres options se révélaient plus efficace. 
 
-#### Semaine 47
+### Organisation du travail
 
 Mattéo a programmé les permutations de cartes pseudo-aléatoires du fichier [src/XpatRandom.ml](), générées à partir de l'entier appelé graine. Nous avons eu des difficultés à obtenir les permutations attendues, jusqu'à ce qu'on puisse comparer nos résultats intermédiaires avec ceux donnés pour la graine 1. Adèle a programmé l'initialisation d'une partie et la distribution des cartes dans [src/XpatSolver.ml](). 
 
-#### Semaine 48
-
 Adèle a débuté l'écriture du rapport. 
 
-### Semmaine 50
+Mattéo a implémenté les fonctions de normalisation d'état ainsi que de vérification de la légalité d'un coup donné, la gestion des entrées/sorties fichier, les ensembles d'états, ainsi qu'une fonction permettant de récupérer les états atteignables depuis un état donné selon les règles courantes.
 
-Mattéo a implémenté les fonctions de normalisation d'état ainsi que de vérification de la légalité d'un coup donné.
+Adèle a implémenté le parcours du graphe des états qui représentent la partie, a optimisé les fonctions de récupération d'états atteignables, et a créé un script pour tester la solvabilité de différentes configurations en donnant le temps mis pour l'effectuer. 
 
 ### Divers
 *TODO : Cette partie est entièrement libre : remarques, suggestions, questions...*
