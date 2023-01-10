@@ -133,7 +133,7 @@ let respecteEnchainement
 ;;
 
 
-(* Renvoie vrai si la carte représentée par dest est au sommet d'une des colonnes de l'état etat *)
+(* Renvoie une liste de toutes les cartes au sommet des colonnes *)
 let getCartesSommets (etat : etat) =
   let rec colSearcher colonnes ret =
     match colonnes with
@@ -186,13 +186,14 @@ let respecteColonneVide (src : Card.card) (regles : regles) =
 
 (* Renvoie vrai si le coup est légal par rapport aux règles et à l'état courant *)
 let coupLegal (coup : coup) (regles : regles) (etat : etat) =
-  (* TODO *)
   match coup.destination with
   | "V" -> (estAccessibleGeneral etat coup.source) && (possedeColonneVide etat) && (respecteColonneVide coup.source regles)
   | "T" -> ((List.length etat.registre) < regles.capaciteRegistre) && (estAccessibleGeneral etat coup.source)
   | x ->
-    let input = int_of_string x in
-    (estAccessibleSurColonne etat input && respecteEnchainement coup.source (Card.of_num input) regles.enchainement && (estAccessibleGeneral etat coup.source))
+    let dest = int_of_string x in
+    (estAccessibleSurColonne etat dest && 
+    respecteEnchainement coup.source (Card.of_num dest) regles.enchainement && 
+    (estAccessibleGeneral etat coup.source))
 ;; 
 
 (* Renvoie vrai si la carte carte est seule sur sa colonne *)
@@ -214,7 +215,7 @@ let coupLegalSrc (source : Card.card) (regles : regles) (etat : etat) =
       let coup = { source = source; destination = dest } in
       if coupLegal coup regles etat then legal_rec source rest regles etat (coup :: ret)
       else legal_rec source rest regles etat ret
-  in let paquet = ("T" :: "V" :: (List.map (fun x -> string_of_int x) (List.map (fun x -> Card.to_num x) (getCartesSommets etat))))
+  in let paquet = ("T" :: "V" :: ((List.map (fun x -> string_of_int (Card.to_num x)) (getCartesSommets etat))))
   in legal_rec source (List.rev paquet) regles etat []
 ;;
 
@@ -388,14 +389,6 @@ let miseAJourPartie (coup : coup) (etat : etat) =
   | cardstring -> let cardnum = int_of_string cardstring in deplacerDansCol coup etat cardnum
 ;;
 
-(* renvoie vrai si le dépot est rempli de rois *)
-let rec conditionDeVictoire depot =
-  match depot with
-  | [] -> true
-  | carte :: rest ->
-    if (fst(carte) < 13) then false else conditionDeVictoire rest
-;;
-
 (* Transforme la permutation en liste de cartes : ATTENTION inverse l'ordre*)
 let rec permutToCardList (permut : int list) (ret : Card.card list) =
   match permut with
@@ -454,28 +447,80 @@ let rec stringListToCoups list ret =
 
 (* PARTIE 2.2 : recherche de solutions *)
 
-(* Pour un etat donné, créé une liste de (coup, etatResultant) possibles pour toutes les cartes de l'état *)
-let creerListeDeCoupsPossible etat regles =
-  let rec parcoursCol cols regles etat ret =
-    match cols with
-    |[] -> ret
-    | p :: rest ->
-      match Pile.peekPile p with
-      | None -> parcoursCol rest regles etat ret
-      | Some carte ->
-        parcoursCol rest regles etat (List.rev_append ret (coupLegalSrc carte regles etat))
-  in let ret = parcoursCol etat.colonnes regles etat [] in 
-  let retReg = List.flatten (List.map (fun x -> coupLegalSrc x regles etat) etat.registre) 
-  in let listeCoups = List.rev_append retReg ret
-  (*in let () = List.iter (fun x -> let () = print_string(Card.to_string x.source)in let () = print_string("  ") in
-                  match x.destination with
-                  | "T"-> print_string "T"; print_newline ()
-                  | "V"-> print_string "V"; print_newline ()
-                  | (x:string) -> print_string (Card.to_string (Card.of_num (int_of_string x))); print_newline () ) listeCoups *)
+let getEtatsLegaux (source : Card.card) (etatInit : etat) (regles : regles) : etat list =
   
-  in let listeEtatsDonnes = List.map (fun x -> normaliser (miseAJourPartie x etat)) listeCoups
-  in listeEtatsDonnes
-;; 
+  (* Renvoie la liste des cartes sur lequel le déplacement serait légal, et s'il y a une col vide *)
+  let rec parcourirCols (cols : (Card.card Pile.pile) list) (cardColLegal : Card.card list) (hasColVide : bool) : (Card.card list * bool) = 
+    match cols with
+    | [] -> (cardColLegal, hasColVide)
+    | pile::tail -> 
+      if pile.Pile.taille = 0 then parcourirCols tail cardColLegal true
+      else let dest, pileTail = Pile.popPile pile in 
+      if respecteEnchainement source dest regles.enchainement
+        then parcourirCols tail (dest::cardColLegal) hasColVide
+        else parcourirCols tail cardColLegal hasColVide
+  in
+  
+  let (cardColLegal, hasColVide) = parcourirCols etatInit.colonnes [] false in
+  
+  (* Transforme la liste de cartes destinations en liste d'états légaux normalisés *)
+  let etatsLegaux = 
+    List.map 
+    (
+      fun dest -> normaliser
+        (miseAJourPartie ({source = source; destination = string_of_int (Card.to_num dest)}) etatInit)
+    ) 
+    cardColLegal
+  in
+  
+  (* Renvoie l'état correspondant à la carte déplacée dans une col vide, ou None si aucune dispo *)
+  let getEtatVide : etat option = 
+    if not hasColVide then None else
+    match regles.carteSurColonneVide with
+    | None -> None
+    | Some(rangOption) ->
+      match rangOption with
+      | None -> Some (normaliser (miseAJourPartie ({source=source; destination="V"}) etatInit))
+      | Some(rangValideReel) -> 
+        if (fst source) = rangValideReel  
+        then Some (normaliser (miseAJourPartie ({source=source; destination="V"}) etatInit))
+        else None
+  in
+  
+  (* Renvoie l'état avec la carte déplacée dans le registre, ou None si pas la place *)
+  let getEtatRegistre : etat option =
+    if (List.length etatInit.registre) < regles.capaciteRegistre 
+    then Some (normaliser (miseAJourPartie ({source=source; destination="T"}) etatInit))
+    else None
+  in
+  
+  let etatVide = getEtatVide in 
+  let etatsLegaux = (match etatVide with
+  | None -> etatsLegaux
+  | Some(e) -> e::etatsLegaux) in
+  
+  let etatRegistre = getEtatRegistre in
+  let etatsLegaux = (match etatRegistre with
+  | None -> etatsLegaux
+  | Some(e) -> e::etatsLegaux) in
+  
+  etatsLegaux
+;;
+
+let creerListeEtatsPossibles (etatInit : etat) (regles : regles) : etat list =
+
+  let cartesAccessibles = getCartesSommets etatInit in
+  let cartesAccessibles = List.rev_append etatInit.registre cartesAccessibles in
+  
+  let rec parcourirCartes (cartesAccessibles : Card.card list) (acc : etat list) : etat list =
+    match cartesAccessibles with
+    | [] -> acc
+    | carte::tail -> parcourirCartes tail (List.rev_append (getEtatsLegaux carte etatInit regles) acc)
+  in
+  
+  parcourirCartes cartesAccessibles []
+;;
+
 
 
 (* PARTIE 2.3  : ensembles d'états *)
@@ -511,95 +556,6 @@ let rec bouclePrincipaleVerif etatCourant regles coupsList iter =
       else let () = print_string "ECHEC " in let () = print_int iter in let () = print_newline () in exit 1
 ;;
 
-(* prend en arguement l'état initial, 
-   cherche de manière exhaustive un état ou le score = 52 par BFS,
-   renvoie cet état final ou None s'il n'existe pas 
-*)
-(*
-let bfsStart (etatCourant : etat) (etatsParcourus : States.t) (regles : regles) : (States.t * etat option) =
-  
-  let rec bfsRec (etatsParcourus : States.t) (file : etat Fifo.t) : (etat option * States.t * etat Fifo.t) =
-    let () = if States.cardinal etatsParcourus mod 1000 = 0 then
-      (print_string "\nBFS nbr états parcourus : ";
-      print_int (States.cardinal etatsParcourus);
-      print_newline ())
-    else () in 
-    
-    (* si la file est vide, c'est qu'il n'y a pas d'état final gagnant *)
-    if file = Fifo.empty then (None, etatsParcourus, file) else
-      
-    (* retirer l'état de la file *)
-    let etatCourant, file = Fifo.pop file in
-    if etatCourant.score = 52 then (Some etatCourant, etatsParcourus, file) else
-    
-    (* itérer sur la liste d'états atteignables depuis cet état,
-       les ajouter à la file et à l'ensemble d'état parcourus *)
-    let rec parcourirEtats file etatsParcourus etatsAtteignables =
-      match etatsAtteignables with
-      | [] -> file, etatsParcourus
-      | x::tail -> if (not (States.mem x etatsParcourus)) 
-        then parcourirEtats (Fifo.push x file) (States.add x etatsParcourus) tail
-        else parcourirEtats file etatsParcourus tail
-    in
-    
-    let etatsAtteignables = creerListeDeCoupsPossible etatCourant regles in
-    let file, etatsParcourus = parcourirEtats file etatsParcourus etatsAtteignables in
-    let file = Fifo.of_list (List.fast_sort (fun x y -> -1 * Stdlib.compare (x.score) (y.score)) (Fifo.to_list file)) in
-    bfsRec etatsParcourus file 
-  in
-  
-  let f = Fifo.empty in
-    let etatFinal, etatsParcourus, file = (bfsRec (States.add etatCourant etatsParcourus) (Fifo.push etatCourant f)) in
-    (etatsParcourus, etatFinal)
-;;*)
-
-(* Parcours en profondeur sur le graphe des états du jeu *)
-(*
-let rec dfs etatCourant (etatsParcourus : States.t) regles =
-  let () = if States.cardinal etatsParcourus mod 1000 = 0 then
-    (print_string "\nDFS nbr états parcourus : ";
-    print_int (States.cardinal etatsParcourus);
-    print_newline ())
-  else () in 
-
- (*printEtat etatCourant;*)
-  (* condition de terminaison *)
-  if (etatCourant.score = 52) then (etatsParcourus, Some etatCourant) else
-  (* On ajoute l'état courant aux états parcourus *)
-  let etatsParcourus = (States.add etatCourant etatsParcourus) in 
-  (* On récupère les voisins *)
-  let etatsAtteignables = List.fast_sort (fun x y -> -1 * Stdlib.compare (x.score) (y.score)) (creerListeDeCoupsPossible etatCourant regles) in
-  (*let () = List.iter (fun x -> printEtat x) etatsAtteignables in*)
-  (* On itère sur les voisins *)
-  let rec iterListeEtats (etatsAParcourir : Etat.etat list) (etatsParcourus : States.t)=
-    match etatsAParcourir with
-    (* Si on atteint la fin de la liste de voisins alors on est sur une branche d'échec *)
-    | [] -> (etatsParcourus, None)
-    | etat :: etatsRestants ->
-
-    (* let () = printEtat etat in
-     let () = print_bool (States.mem etat etatsParcourus) in *)
-     
-      (* Si on trouve un voisin, alors on appelle DFS dessus et on récupère son Set de mémoire *)
-      if States.mem etat etatsParcourus then iterListeEtats etatsRestants etatsParcourus 
-      else if etat.score < 30
-        then let etatsParcourusMAJ = dfs etat etatsParcourus regles in 
-        match etatsParcourusMAJ with
-          (* Si on a pas trouvé de solution dans ce sous arbre, alors on passe au voisin suivant*)
-          | (newEtatsParcourus, None) -> iterListeEtats etatsRestants newEtatsParcourus
-          (* Sinon, on renvoie l'état trouvé!*)
-          | (newEtatsParcourus, Some etat) -> (newEtatsParcourus, Some etat) 
-      else 
-        let etatsParcourusMAJ = bfsStart etat etatsParcourus regles in 
-        match etatsParcourusMAJ with
-        (* Si on a pas trouvé de solution dans ce sous arbre, alors on passe au voisin suivant*)
-        | (newEtatsParcourus, None) -> iterListeEtats etatsRestants newEtatsParcourus
-        (* Sinon, on renvoie l'état trouvé!*)
-        | (newEtatsParcourus, Some etat) -> (newEtatsParcourus, Some etat) 
-  in let tupleSetEtEtatFinal = iterListeEtats etatsAtteignables (etatsParcourus) in 
-  tupleSetEtEtatFinal
-;;*)
-
 
 let dfs2 
   (etatCourant : etat) 
@@ -625,16 +581,16 @@ let dfs2
     in
     
     (*
-    let () = if States.cardinal etatsParcourus mod 2000 = 0 then
+    let () = if States.cardinal etatsParcourus mod 10000 = 0 then
       (Printf.printf "\nDFS2 nbr états en mémoire : %d" (States.cardinal etatsParcourus);
-      Printf.printf "\nDFS2 nbr états dans la pile : %d" (List.length pile);
+      Printf.printf "\nnbr états dans la pile : %d" (List.length pile);
       Printf.printf "\nScore actuel : %d" etatCourant.score;
       Printf.printf "\nScore du dernier filtrage : %d" meilleurScore;
       print_newline ();)
     else () in 
     *)
     
-    (* condition de vistoire *)
+    (* condition de victoire *)
     if etatCourant.score = 52 then (Some etatCourant, etatsParcourus, pile) else
     
     let distanceDoubli = 8 in 
@@ -663,7 +619,7 @@ let dfs2
     in
     
     let pile, etatsParcourus = 
-      parcourirEtats pile etatsParcourus (creerListeDeCoupsPossible etatCourant regles) addCondition in
+      parcourirEtats pile etatsParcourus (creerListeEtatsPossibles etatCourant regles) addCondition in
       
     let pile = List.fast_sort (fun x y -> -1 * Stdlib.compare (x.score) (y.score)) pile in
     dfsRec etatsParcourus pile addCondition aFiltrer meilleurScore
@@ -672,26 +628,31 @@ let dfs2
   let p = [etatCourant] in
   let etatFinal, etatsParcourus, pile = 
     dfsRec (States.add etatCourant etatsParcourus) p (fun x -> true) aFiltrer 0 in
+  (*Printf.printf "Etats de la mémoire finale : %d\n" (States.cardinal etatsParcourus);*)
   (etatsParcourus, etatFinal)
 ;;
 
 
-
+(* recherche non-exhaustive, si aucune solution alors recherche exhaustive *)
 let bouclePrincipaleRecherche (etatInit : etat) regles (fichier : string) =
   let (memoire, etatTrouve) = dfs2 etatInit States.empty regles true in 
   match etatTrouve with
-  | None -> printf "INSOLUBLE"; exit 2
   | Some etatFinal -> let () = ecrireCoupsDansFichier etatFinal.historique fichier in
-                      printf "SUCCES"; exit 0
-
+    printf "SUCCES"; exit 0
+  | None -> let (mem, etatTrouve) = dfs2 etatInit States.empty regles false in 
+            match etatTrouve with
+            | None -> printf "INSOLUBLE"; exit 2
+            | Some etatFinal-> let () = ecrireCoupsDansFichier etatFinal.historique fichier in
+            printf "SUCCES"; exit 0
 
 
 
 let treat_game conf =
   let permut = XpatRandom.shuffle conf.seed in
+  (*
   print_newline ();
   print_conf conf;
-    
+  *)
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
   let etat1 = normaliser (construireEtatInit conf regles paquet) in
