@@ -78,16 +78,17 @@ Implémente une structure de type LIFO ainsi que la plupart des méthodes associ
 
 #### Autres structures
 
-Le type regles :
+Le type règles :
 - la capacité du registre
 - le nombre de colonnes
 - la distribution des cartes : une liste du nombre de cartes dans chaque colonne
-  carteSurColonneVide : (Card.rank option) option; (* Quel est le rang de carte autorisé sur une colonne vide : None -> Aucun, Some (n) -> rang n, Some (None) -> Tous *)
-  enchainement : enchainementCouleur;
+- les cartes autorisées sur les colonnes vides : Une option d'option de rang ( Quel est le rang de carte autorisé sur une colonne vide : None -> Aucun, Some (n) -> rang n, Some (None) -> Tous )
+- l'enchaînement des couleurs : un enchainementCouleur
 
-
-
-
+le type enchainementCouleur : 
+- soit Alternée (noir sur rouge our rouge sur noir)
+- soit Identique (même couleur, au sens du symbole)
+- soit Any (peu importe)
 
 
 ### Organisation du travail
