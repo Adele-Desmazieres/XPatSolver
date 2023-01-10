@@ -7,7 +7,7 @@ TIMEOUT=$3
 rm tmp.txt
 touch tmp.txt
 
-printf "#!/bin/bash\n\nrm results.txt\ntouch results.txt\n\n" > tmp.txt
+printf "#!/bin/bash\n\n" > tmp.txt
 
 
 cat $INPUT \

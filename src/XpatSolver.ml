@@ -196,29 +196,6 @@ let coupLegal (coup : coup) (regles : regles) (etat : etat) =
     (estAccessibleGeneral etat coup.source))
 ;; 
 
-(* Renvoie vrai si la carte carte est seule sur sa colonne *)
-let estSeuleSurColonne (carte : Card.card) etat =
-  let rec parcoursCol cols (carte : Card.card) =
-    match cols with
-    | [] -> false
-    | p :: rest ->
-      if ((Pile.peekPile p) = Some carte) && (p.Pile.taille = 1) then true else parcoursCol rest carte
-  in parcoursCol etat.colonnes carte
-;;
-
-(* Renvoie une liste de coups légaux pour une carte source, un état et des règles donnés *)
-let coupLegalSrc (source : Card.card) (regles : regles) (etat : etat) =
-  let rec legal_rec source dests regles etat ret =
-    match dests with
-    | [] -> ret
-    | dest :: rest ->
-      let coup = { source = source; destination = dest } in
-      if coupLegal coup regles etat then legal_rec source rest regles etat (coup :: ret)
-      else legal_rec source rest regles etat ret
-  in let paquet = ("T" :: "V" :: ((List.map (fun x -> string_of_int (Card.to_num x)) (getCartesSommets etat))))
-  in legal_rec source (List.rev paquet) regles etat []
-;;
-
 (* Construit une liste des cartes qui sont recherchées pour être ajoutées au dépot *)
 let getCartesPourDepot (depot : Card.card list) =
   List.map (fun card -> if fst(card) = 13 then card else (fst(card)+1, snd(card))) depot
@@ -362,10 +339,6 @@ let deplacerDansCol (coup : coup) (etat : etat) (cardnum : int) =
   let colsMoinsCarte = if (estAccessibleSurColonne etat (Card.to_num coup.source))
   then enleverDeCol etat.colonnes [] (coup.source)
   else etat.colonnes in
-  (*print_string (Card.to_string (coup.source));
-  print_newline ();
-  print_string (Card.to_string (Card.of_num(cardnum)));
-  print_newline ();*)
     
   let newCols = if (0 <= cardnum && cardnum <= 51)
   then mettreDansColRec     colsMoinsCarte [] coup.source (Card.of_num cardnum)
@@ -541,7 +514,6 @@ let compEtat etat1 etat2 =
 module States = Set.Make (struct type t = etat let compare = compEtat end)
 
 let rec bouclePrincipaleVerif etatCourant regles coupsList iter =
-  (*printEtat etatCourant;*) 
   match coupsList with 
   | [] -> if etatCourant.score = 52
     then (print_string "SUCCES" ; print_newline ();  exit 0)
@@ -549,9 +521,7 @@ let rec bouclePrincipaleVerif etatCourant regles coupsList iter =
   | coup :: coupsRestants ->
     if coupLegal coup regles etatCourant
       then let newEtat = miseAJourPartie coup etatCourant in 
-          (*printEtat newEtat;*)
            let newEtatNormalise = normaliser newEtat in 
-           (*printEtat newEtatNormalise;*)
            bouclePrincipaleVerif newEtatNormalise regles coupsRestants (iter + 1)
       else let () = print_string "ECHEC " in let () = print_int iter in let () = print_newline () in exit 1
 ;;
@@ -580,27 +550,16 @@ let dfs2
       | e::tail -> e, tail
     in
     
-    (*
-    let () = if States.cardinal etatsParcourus mod 10000 = 0 then
-      (Printf.printf "\nDFS2 nbr états en mémoire : %d" (States.cardinal etatsParcourus);
-      Printf.printf "\nnbr états dans la pile : %d" (List.length pile);
-      Printf.printf "\nScore actuel : %d" etatCourant.score;
-      Printf.printf "\nScore du dernier filtrage : %d" meilleurScore;
-      print_newline ();)
-    else () in 
-    *)
-    
     (* condition de victoire *)
     if etatCourant.score = 52 then (Some etatCourant, etatsParcourus, pile) else
     
+    (* distance min entre le score actuel et les scores à oublier *)
     let distanceDoubli = 8 in 
       
     (* condition de recherche non exhaustive *)
     let pile, etatsParcourus, addCondition, meilleurScore = 
-    if etatCourant.score > distanceDoubli && etatCourant.score > meilleurScore+1 && aFiltrer && (States.cardinal etatsParcourus) >= 20000
+    if etatCourant.score > distanceDoubli && etatCourant.score > meilleurScore && aFiltrer && (States.cardinal etatsParcourus) >= 10000
       then 
-      (*let () = (Printf.printf "\nScore : %d\nScore max : %d\nFiltrage de la pile et la mémoire...\n" etatCourant.score meilleurScore) in
-      let () = print_newline () in*)
       (List.filter (fun etatX -> etatX.score >= etatCourant.score-distanceDoubli) pile), 
       (States.filter (fun etatX -> etatX.score >= etatCourant.score-distanceDoubli) etatsParcourus),
       (fun x -> x.score >= etatCourant.score-distanceDoubli),
@@ -621,14 +580,16 @@ let dfs2
     let pile, etatsParcourus = 
       parcourirEtats pile etatsParcourus (creerListeEtatsPossibles etatCourant regles) addCondition in
       
-    let pile = List.fast_sort (fun x y -> -1 * Stdlib.compare (x.score) (y.score)) pile in
+    
+    let pile = 
+      List.fast_sort (fun x y -> -1 * Stdlib.compare (x.score) (y.score)) pile 
+    in
     dfsRec etatsParcourus pile addCondition aFiltrer meilleurScore
   in
   
   let p = [etatCourant] in
   let etatFinal, etatsParcourus, pile = 
     dfsRec (States.add etatCourant etatsParcourus) p (fun x -> true) aFiltrer 0 in
-  (*Printf.printf "Etats de la mémoire finale : %d\n" (States.cardinal etatsParcourus);*)
   (etatsParcourus, etatFinal)
 ;;
 
@@ -638,21 +599,18 @@ let bouclePrincipaleRecherche (etatInit : etat) regles (fichier : string) =
   let (memoire, etatTrouve) = dfs2 etatInit States.empty regles true in 
   match etatTrouve with
   | Some etatFinal -> let () = ecrireCoupsDansFichier etatFinal.historique fichier in
-    printf "SUCCES"; exit 0
+    printf "\nSUCCES\n"; exit 0
   | None -> let (mem, etatTrouve) = dfs2 etatInit States.empty regles false in 
             match etatTrouve with
-            | None -> printf "INSOLUBLE"; exit 2
+            | None -> printf "\nINSOLUBLE\n"; exit 2
             | Some etatFinal-> let () = ecrireCoupsDansFichier etatFinal.historique fichier in
-            printf "SUCCES"; exit 0
+            printf "\nSUCCES\n"; exit 0
 
 
 
 let treat_game conf =
   let permut = XpatRandom.shuffle conf.seed in
-  (*
-  print_newline ();
-  print_conf conf;
-  *)
+
   let regles = definirRegles conf in
   let paquet = List.rev (permutToCardList permut []) in
   let etat1 = normaliser (construireEtatInit conf regles paquet) in
